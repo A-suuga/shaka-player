@@ -38,6 +38,7 @@ shakaExtern.ManifestParser = function() {};
 /**
  * @typedef {{
  *   networkingEngine: !shaka.net.NetworkingEngine,
+ *   cozyInfo: shaka.util.CozyUtils.CozyInfo,
  *   filterNewPeriod: function(shakaExtern.Period),
  *   filterAllPeriods: function(!Array.<!shakaExtern.Period>),
  *   onTimelineRegionAdded: function(shakaExtern.TimelineRegionInfo),
@@ -53,6 +54,8 @@ shakaExtern.ManifestParser = function() {};
  *
  * @property {!shaka.net.NetworkingEngine} networkingEngine
  *   The networking engine to use for network requests.
+ * @property {shaka.util.CozyUtils.CozyInfo} cozyInfo
+ *   Information needed by the Cozy API
  * @property {function(shakaExtern.Period)} filterNewPeriod
  *   Should be called on a new Period so that it can be filtered.
  * @property {function(!Array.<!shakaExtern.Period>)} filterAllPeriods
