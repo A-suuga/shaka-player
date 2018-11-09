@@ -922,12 +922,23 @@ describe('Playhead', function() {
               Util.spyFunc(onSeek),
               Util.spyFunc(onEvent));
 
-          jasmine.clock().tick(1000);
+          jasmine.clock().tick(500);
           for (let time = data.start; time < data.waitingAt; time++) {
+            // We don't want to run tick() for 1 second because it will trigger
+            // the stall-detection, which will move the playhead; on the other
+            // hand, we don't want to be 0.5 seconds from the gap because on
+            // IE/Edge/Tizen, gap jumping will treat that as in the gap.
+            // See shaka.media.TimeRangesUtils.getGapIndex.
+
             video.currentTime = time;
-            jasmine.clock().tick(1000);
+            jasmine.clock().tick(400);
             // Make sure Playhead didn't adjust the time yet.
             expect(video.currentTime).toBe(time);
+
+            video.currentTime = time + 0.4;
+            jasmine.clock().tick(600);
+            // Make sure Playhead didn't adjust the time yet.
+            expect(video.currentTime).toBe(time + 0.4);
           }
 
           expect(onEvent).not.toHaveBeenCalled();
@@ -935,7 +946,7 @@ describe('Playhead', function() {
           video.currentTime = data.waitingAt;
           video.readyState = HTMLMediaElement.HAVE_CURRENT_DATA;
           video.on['waiting']();
-          jasmine.clock().tick(1000);
+          jasmine.clock().tick(500);
 
           expect(onEvent).toHaveBeenCalledTimes(data.expectEvent ? 1 : 0);
           expect(video.currentTime).toBe(data.expectedEndTime);
@@ -1160,7 +1171,7 @@ describe('Playhead', function() {
                                           Util.spyFunc(onSeek),
                                           Util.spyFunc(onEvent));
 
-      jasmine.clock().tick(1000);
+      jasmine.clock().tick(500);
       expect(onEvent).not.toHaveBeenCalled();
 
       // Append a segment before seeking.
@@ -1170,7 +1181,7 @@ describe('Playhead', function() {
       video.currentTime = 3;
       video.readyState = HTMLMediaElement.HAVE_METADATA;
       video.seeking = true;
-      jasmine.clock().tick(600);
+      jasmine.clock().tick(500);
       video.on['seeking']();
 
       // There should NOT have been a gap jump.
@@ -1206,7 +1217,7 @@ describe('Playhead', function() {
                                           Util.spyFunc(onEvent));
 
       playhead.onSegmentAppended();
-      jasmine.clock().tick(1000);
+      jasmine.clock().tick(500);
 
       expect(seekCount).toBe(1);
       expect(currentTime).toBe(10);
@@ -1237,7 +1248,7 @@ describe('Playhead', function() {
             Util.spyFunc(onSeek),
             Util.spyFunc(onEvent));
 
-        jasmine.clock().tick(1000);
+        jasmine.clock().tick(500);
         expect(onEvent).not.toHaveBeenCalled();
 
         // Seek to the given position and update ready state.
@@ -1250,13 +1261,13 @@ describe('Playhead', function() {
         } else {
           video.seeking = false;
         }
-        jasmine.clock().tick(1000);
+        jasmine.clock().tick(500);
 
         if (data.newBuffered) {
           // If we have a new buffer, first clear the buffer.
           video.buffered = createFakeBuffered([]);
           video.readyState = HTMLMediaElement.HAVE_METADATA;
-          jasmine.clock().tick(1000);
+          jasmine.clock().tick(250);
 
           // Now StreamingEngine will buffer the new content and tell playhead
           // about it.
@@ -1267,7 +1278,7 @@ describe('Playhead', function() {
             video.seeking = false;
           }
           playhead.onSegmentAppended();
-          jasmine.clock().tick(1000);
+          jasmine.clock().tick(250);
         }
 
         expect(onEvent).toHaveBeenCalledTimes(data.expectEvent ? 1 : 0);

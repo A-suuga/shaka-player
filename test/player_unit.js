@@ -186,6 +186,25 @@ describe('Player', function() {
       }).catch(fail).then(done);
     });
 
+    it('destroys mediaSourceEngine before drmEngine', async () => {
+      goog.asserts.assert(manifest, 'Manifest should be non-null');
+      let parser = new shaka.test.FakeManifestParser(manifest);
+      let factory = function() { return parser; };
+
+      mediaSourceEngine.destroy.and.callFake(() => {
+        expect(drmEngine.destroy).not.toHaveBeenCalled();
+        return Util.delay(0.01).then(() => {
+          expect(drmEngine.destroy).not.toHaveBeenCalled();
+        });
+      });
+
+      await player.load('', 0, factory);
+      await player.destroy();
+
+      expect(mediaSourceEngine.destroy).toHaveBeenCalled();
+      expect(drmEngine.destroy).toHaveBeenCalled();
+    });
+
     it('destroys parser first when interrupting load', function(done) {
       let p = shaka.test.Util.delay(0.3);
       let parser = new shaka.test.FakeManifestParser(manifest);
@@ -1046,6 +1065,22 @@ describe('Player', function() {
       let newConfig = player.getConfiguration();
       expect(newConfig.streaming.bufferBehind).toEqual(77);
     });
+
+    // https://github.com/google/shaka-player/issues/1524
+    it('does not pollute other advanced DRM configs', () => {
+      player.configure('drm.advanced.foo', {});
+      player.configure('drm.advanced.bar', {});
+      const fooConfig1 = player.getConfiguration().drm.advanced.foo;
+      const barConfig1 = player.getConfiguration().drm.advanced.bar;
+      expect(fooConfig1.distinctiveIdentifierRequired).toEqual(false);
+      expect(barConfig1.distinctiveIdentifierRequired).toEqual(false);
+
+      player.configure('drm.advanced.foo.distinctiveIdentifierRequired', true);
+      const fooConfig2 = player.getConfiguration().drm.advanced.foo;
+      const barConfig2 = player.getConfiguration().drm.advanced.bar;
+      expect(fooConfig2.distinctiveIdentifierRequired).toEqual(true);
+      expect(barConfig2.distinctiveIdentifierRequired).toEqual(false);
+    });
   });
 
   describe('AbrManager', function() {
@@ -1123,6 +1158,40 @@ describe('Player', function() {
       })
       .catch(fail)
       .then(done);
+    });
+
+    it('reuses AbrManager instance', async () => {
+      /** @type {!jasmine.Spy} */
+      const spy =
+          jasmine.createSpy('AbrManagerFactory').and.returnValue(abrManager);
+      player.configure({abrFactory: spy});
+
+      await player.load('', 0, parserFactory);
+      expect(spy).toHaveBeenCalled();
+      spy.calls.reset();
+
+      await player.load('', 0, parserFactory);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('creates new AbrManager if factory changes', async () => {
+      /** @type {!jasmine.Spy} */
+      const spy1 =
+          jasmine.createSpy('AbrManagerFactory').and.returnValue(abrManager);
+      /** @type {!jasmine.Spy} */
+      const spy2 =
+          jasmine.createSpy('AbrManagerFactory').and.returnValue(abrManager);
+      player.configure({abrFactory: spy1});
+
+      await player.load('', 0, parserFactory);
+      expect(spy1).toHaveBeenCalled();
+      expect(spy2).not.toHaveBeenCalled();
+      spy1.calls.reset();
+
+      player.configure({abrFactory: spy2});
+      await player.load('', 0, parserFactory);
+      expect(spy1).not.toHaveBeenCalled();
+      expect(spy2).toHaveBeenCalled();
     });
   });
 
