@@ -535,6 +535,11 @@ def main(args):
       type=str,
       default='compiled')
 
+  parser.add_argument(
+      '--nodemo',
+      help='Build only the library.',
+      action='store_true')
+
   parsed_args, commands = parser.parse_known_args(args)
 
   # If no commands are given then use complete  by default.
@@ -555,15 +560,18 @@ def main(args):
   name = parsed_args.name
   rebuild = parsed_args.force
   is_debug = parsed_args.mode == 'debug'
+  no_demo = parsed_args.nodemo
 
   if not custom_build.build_library(name, rebuild, is_debug):
     return 1
 
-  if not compile_demo(rebuild, is_debug):
-    return 1
+  # Do not compile the demo if --nodemo was added to the command line
+  if not no_demo:
+    if not compile_demo(rebuild, is_debug):
+      return 1
 
-  if not compile_receiver(rebuild, is_debug):
-    return 1
+    if not compile_receiver(rebuild, is_debug):
+      return 1
 
   return 0
 
