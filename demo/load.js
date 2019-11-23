@@ -47,6 +47,27 @@ function shakaUncompiledModeSupported() {
     importScript(baseUrl + src);
   }
 
+  // NOTE: This is a quick-and-easy hack based on assumption that the old
+  // demo page will be replaced in the near future.
+  function loadSpecificCss(href, linkRel) {
+    var link = document.createElement('link');
+    link.type = 'text/css';
+    link.href = baseUrl + href;
+    link.rel = linkRel;
+
+    document.head.appendChild(link);
+  }
+  function loadCss(buildType) {
+    // These should override the compiled versions, which have already been
+    // hard-coded into the HTML.  This get us the best balance between avoiding
+    // a flash of unstyled content and allowing the developer to quickly reload
+    // uncompiled LESS in uncompiled mode.
+    if (buildType == 'uncompiled') {
+      loadSpecificCss('../ui/controls.less', 'stylesheet/less');
+      loadSpecificCss('../demo/demo.less', 'stylesheet/less');
+    }
+  }
+
   function importScript(src) {
     var script = document.createElement('script');
     script.type = 'text/javascript';
@@ -57,6 +78,7 @@ function shakaUncompiledModeSupported() {
     script.async = false;
     document.head.appendChild(script);
   }
+
   window.CLOSURE_IMPORT_SCRIPT = importScript;
 
   var fields = location.search.substr(1);
@@ -65,38 +87,56 @@ function shakaUncompiledModeSupported() {
   fragments = fragments ? fragments.split(';') : [];
   var combined = fields.concat(fragments);
 
-  var scripts = window['UNCOMPILED_JS'];
   var buildType = 'uncompiled';
   var buildSpecified = false;
 
   if (!shakaUncompiledModeSupported()) {
     // If uncompiled mode is not supported, default to the compiled debug
     // version, which should still work.
-    scripts = window['COMPILED_DEBUG_JS'];
     buildType = 'debug_compiled';
   }
 
   if (!navigator.onLine) {
     // If we're offline, default to the compiled version, which may have been
     // cached by the service worker.
-    scripts = window['COMPILED_JS'];
     buildType = 'compiled';
   }
 
   // Very old browsers do not have Array.prototype.indexOf, so we loop.
   for (var i = 0; i < combined.length; ++i) {
-    if (combined[i] == 'compiled' || combined[i] == 'build=compiled') {
-      scripts = window['COMPILED_JS'];
+    if (combined[i] == 'build=compiled') {
       buildType = 'compiled';
       buildSpecified = true;
       break;
     }
     if (combined[i] == 'build=debug_compiled') {
-      scripts = window['COMPILED_DEBUG_JS'];
       buildType = 'debug_compiled';
       buildSpecified = true;
       break;
     }
+    if (combined[i] == 'build=uncompiled') {
+      buildType = 'uncompiled';
+      buildSpecified = true;
+      break;
+    }
+  }
+
+  if (!shakaUncompiledModeSupported() && buildType == 'uncompiled') {
+    // The URL says uncompiled, but we know it won't work.  This URL was
+    // probably copied from some other browser, but it won't work in this one.
+    // Force the use of the compiled debug build and update the hash.
+    buildType = 'debug_compiled';
+
+    // Replace the build type in either the hash or the URL parameters.
+    // At this point, we don't know precisely which contained the build type.
+    location.hash = location.hash.replace(
+        'build=uncompiled', 'build=debug_compiled');
+    location.href = location.href.replace(
+        'build=uncompiled', 'build=debug_compiled');
+    // Changing location.href will trigger a refresh of the page.  If the
+    // build type was in the URL parameters, the page will now be refreshed.
+    // If the build type was in the hash, the page will continue to load with
+    // an updated hash and the correct library type.
   }
 
   // If no build was specified in the URL, update the fragment with the default
@@ -108,8 +148,15 @@ function shakaUncompiledModeSupported() {
     location.hash += 'build=' + buildType;
   }
 
+  loadCss(buildType);
+
   // The application must define its list of compiled and uncompiled sources
   // before including this loader.  The URLs should be relative to the page.
+  var scripts = {
+    'compiled': window['COMPILED_JS'],
+    'debug_compiled': window['COMPILED_DEBUG_JS'],
+    'uncompiled': window['UNCOMPILED_JS'],
+  }[buildType];
   for (var j = 0; j < scripts.length; ++j) {
     loadRelativeScript(scripts[j]);
   }

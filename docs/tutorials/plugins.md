@@ -42,7 +42,7 @@ __Subtitle/caption parsers__
 __Subtitle/caption displayers__
   - Configured at runtime on a Player instance
   - Use {@link player.configure} and set the `textDisplayFactory` field
-  - Must implement the {@link shakaExtern.TextDisplayer} interface
+  - Must implement the {@link shaka.extern.TextDisplayer} interface
   - Default TextDisplayer implementation:
     {@linksource shaka.text.SimpleTextDisplayer}
 
@@ -57,7 +57,7 @@ __Networking plugins__
 __ABR plugins__
   - Configured at runtime on a Player instance
   - Use {@link player.configure} and set the `abrFactory` field
-  - Must implement the {@link shakaExtern.AbrManager} interface
+  - Must implement the {@link shaka.extern.AbrManager} interface
   - Default AbrManager implementation: {@linksource shaka.abr.SimpleAbrManager}
 
 __Polyfills__
@@ -173,5 +173,5 @@ If you have a great plugin that you'd like to contribute back to the community,
 we'd love to hear from you.  You can get in touch via our [issue tracker][] to
 discuss it, and once it's ready, you can send a [pull request][] on github.
 
-[issue tracker]: https://github.com/google/shaka-player/issues/new
+[issue tracker]: https://github.com/google/shaka-player/issues/new/choose
 [pull request]: https://github.com/google/shaka-player/pull/new/master

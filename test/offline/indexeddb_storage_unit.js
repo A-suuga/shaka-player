@@ -27,7 +27,7 @@ describe('IndexeddbStorageCell', function() {
 
   const noop = () => {};
 
-  /** @type {!Array.<shakaExtern.StorageCell>} */
+  /** @type {!Array.<shaka.extern.StorageCell>} */
   let cells = [];
 
   /** @type {!Array.<IDBDatabase>} */
@@ -48,10 +48,10 @@ describe('IndexeddbStorageCell', function() {
   });
 
   it('can add, get, and remove segments', checkAndRun(function(done) {
-    /** @type {shakaExtern.StorageCell} */
+    /** @type {shaka.extern.StorageCell} */
     let cell;
 
-    /** @type {!Array.<shakaExtern.SegmentDataDB>} */
+    /** @type {!Array.<shaka.extern.SegmentDataDB>} */
     let segments = [
       OfflineUtils.createSegmentData([0]),
       OfflineUtils.createSegmentData([0, 1]),
@@ -91,10 +91,10 @@ describe('IndexeddbStorageCell', function() {
   }));
 
   it('can add, get, and remove manifests', checkAndRun(function(done) {
-    /** @type {shakaExtern.StorageCell} */
+    /** @type {shaka.extern.StorageCell} */
     let cell;
 
-    /** @type {!Array.<shakaExtern.ManifestDB>} */
+    /** @type {!Array.<shaka.extern.ManifestDB>} */
     let manifests = [
       OfflineUtils.createManifest('original-uri-1'),
       OfflineUtils.createManifest('original-uri-2'),
@@ -134,10 +134,10 @@ describe('IndexeddbStorageCell', function() {
   }));
 
   it('can add and get all manifests', checkAndRun(function(done) {
-    /** @type {shakaExtern.StorageCell} */
+    /** @type {shaka.extern.StorageCell} */
     let cell;
 
-    /** @type {!Array.<shakaExtern.ManifestDB>} */
+    /** @type {!Array.<shaka.extern.ManifestDB>} */
     let manifests = [
       OfflineUtils.createManifest('original-uri-1'),
       OfflineUtils.createManifest('original-uri-2'),
@@ -162,7 +162,7 @@ describe('IndexeddbStorageCell', function() {
     }).then((found) => {
       expect(found).toBeTruthy();
 
-      let actual = keys.map((key) => found[key]);
+      let actual = keys.map((key) => found.get(key));
       expect(actual[0]).toEqual(manifests[0]);
       expect(actual[1]).toEqual(manifests[1]);
       expect(actual[2]).toEqual(manifests[2]);
@@ -170,10 +170,10 @@ describe('IndexeddbStorageCell', function() {
   }));
 
   it('can add, get, and update manifests', checkAndRun(function(done) {
-    /** @type {shakaExtern.StorageCell} */
+    /** @type {shaka.extern.StorageCell} */
     let cell;
 
-    /** @type {shakaExtern.ManifestDB} */
+    /** @type {shaka.extern.ManifestDB} */
     let originalManifest = OfflineUtils.createManifest('original');
     originalManifest.expiration = 1000;
 
@@ -230,7 +230,7 @@ describe('IndexeddbStorageCell', function() {
 
   /**
    * @param {IDBDatabase} connection
-   * @return {shakaExtern.StorageCell}
+   * @return {shaka.extern.StorageCell}
    */
   function makeCell(connection) {
     let cell = new shaka.offline.indexeddb.V2StorageCell(

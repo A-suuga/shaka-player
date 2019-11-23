@@ -16,14 +16,16 @@
  */
 
 
-/** @externs */
+/**
+ * @externs
+ */
 
 
 /**
  * @interface
  * @exportDoc
  */
-shakaExtern.CueRegion = function() {};
+shaka.extern.CueRegion = function() {};
 
 
 /**
@@ -31,7 +33,7 @@ shakaExtern.CueRegion = function() {};
  * @type {string}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.id;
+shaka.extern.CueRegion.prototype.id;
 
 
 /**
@@ -39,7 +41,7 @@ shakaExtern.CueRegion.prototype.id;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.viewportAnchorX;
+shaka.extern.CueRegion.prototype.viewportAnchorX;
 
 
 /**
@@ -47,7 +49,7 @@ shakaExtern.CueRegion.prototype.viewportAnchorX;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.viewportAnchorY;
+shaka.extern.CueRegion.prototype.viewportAnchorY;
 
 
 /**
@@ -56,7 +58,7 @@ shakaExtern.CueRegion.prototype.viewportAnchorY;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.regionAnchorX;
+shaka.extern.CueRegion.prototype.regionAnchorX;
 
 
 /**
@@ -65,7 +67,7 @@ shakaExtern.CueRegion.prototype.regionAnchorX;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.regionAnchorY;
+shaka.extern.CueRegion.prototype.regionAnchorY;
 
 
 /**
@@ -73,7 +75,7 @@ shakaExtern.CueRegion.prototype.regionAnchorY;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.width;
+shaka.extern.CueRegion.prototype.width;
 
 
 /**
@@ -81,7 +83,7 @@ shakaExtern.CueRegion.prototype.width;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.height;
+shaka.extern.CueRegion.prototype.height;
 
 
 /**
@@ -89,7 +91,7 @@ shakaExtern.CueRegion.prototype.height;
  * @type {shaka.text.CueRegion.units}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.heightUnits;
+shaka.extern.CueRegion.prototype.heightUnits;
 
 
 /**
@@ -97,7 +99,7 @@ shakaExtern.CueRegion.prototype.heightUnits;
  * @type {shaka.text.CueRegion.units}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.widthUnits;
+shaka.extern.CueRegion.prototype.widthUnits;
 
 
 /**
@@ -105,7 +107,7 @@ shakaExtern.CueRegion.prototype.widthUnits;
  * @type {shaka.text.CueRegion.units}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.viewportAnchorUnits;
+shaka.extern.CueRegion.prototype.viewportAnchorUnits;
 
 
 /**
@@ -116,14 +118,14 @@ shakaExtern.CueRegion.prototype.viewportAnchorUnits;
  * @type {shaka.text.CueRegion.scrollMode}
  * @exportDoc
  */
-shakaExtern.CueRegion.prototype.scroll;
+shaka.extern.CueRegion.prototype.scroll;
 
 
 /**
  * @interface
  * @exportDoc
  */
-shakaExtern.Cue = function() {};
+shaka.extern.Cue = function() {};
 
 
 /**
@@ -132,7 +134,7 @@ shakaExtern.Cue = function() {};
  * @type {number}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.startTime;
+shaka.extern.Cue.prototype.startTime;
 
 
 /**
@@ -141,7 +143,7 @@ shakaExtern.Cue.prototype.startTime;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.endTime;
+shaka.extern.Cue.prototype.endTime;
 
 
 /**
@@ -149,15 +151,15 @@ shakaExtern.Cue.prototype.endTime;
  * @type {!string}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.payload;
+shaka.extern.Cue.prototype.payload;
 
 
 /**
  * The region to render the cue into.
- * @type {shakaExtern.CueRegion}
+ * @type {shaka.extern.CueRegion}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.region;
+shaka.extern.Cue.prototype.region;
 
 
 /**
@@ -166,7 +168,7 @@ shakaExtern.Cue.prototype.region;
  * @type {?number}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.position;
+shaka.extern.Cue.prototype.position;
 
 
 /**
@@ -174,7 +176,7 @@ shakaExtern.Cue.prototype.position;
  * @type {shaka.text.Cue.positionAlign}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.positionAlign;
+shaka.extern.Cue.prototype.positionAlign;
 
 
 /**
@@ -182,7 +184,7 @@ shakaExtern.Cue.prototype.positionAlign;
  * @type {number}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.size;
+shaka.extern.Cue.prototype.size;
 
 
 /**
@@ -190,15 +192,23 @@ shakaExtern.Cue.prototype.size;
  * @type {shaka.text.Cue.textAlign}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.textAlign;
+shaka.extern.Cue.prototype.textAlign;
 
 
 /**
- * Text writing direction of the cue.
- * @type {shaka.text.Cue.writingDirection}
+ * Text direction of the cue.
+ * @type {shaka.text.Cue.direction}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.writingDirection;
+shaka.extern.Cue.prototype.direction;
+
+
+/**
+ * Text writing mode of the cue.
+ * @type {shaka.text.Cue.writingMode}
+ * @exportDoc
+ */
+shaka.extern.Cue.prototype.writingMode;
 
 
 /**
@@ -207,7 +217,7 @@ shakaExtern.Cue.prototype.writingDirection;
  * @type {shaka.text.Cue.lineInterpretation}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.lineInterpretation;
+shaka.extern.Cue.prototype.lineInterpretation;
 
 
 /**
@@ -216,7 +226,7 @@ shakaExtern.Cue.prototype.lineInterpretation;
  * @type {?number}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.line;
+shaka.extern.Cue.prototype.line;
 
 
 /**
@@ -226,23 +236,32 @@ shakaExtern.Cue.prototype.line;
  * @type {string}.
  * @exportDoc
  */
-shakaExtern.Cue.prototype.lineHeight;
+shaka.extern.Cue.prototype.lineHeight;
 
 
 /**
  * Line alignment of the cue box.
+ * Start alignment means the cue box’s top side (for horizontal cues), left side
+ * (for vertical growing right), or right side (for vertical growing left) is
+ * aligned at the line.
+ * Center alignment means the cue box is centered at the line.
+ * End alignment The cue box’s bottom side (for horizontal cues), right side
+ * (for vertical growing right), or left side (for vertical growing left) is
+ * aligned at the line.
  * @type {shaka.text.Cue.lineAlign}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.lineAlign;
+shaka.extern.Cue.prototype.lineAlign;
 
 
 /**
  * Vertical alignments of the cues within their extents.
+ * 'BEFORE' means displaying the captions at the top of the text display
+ * container box, 'CENTER' means in the middle, 'AFTER' means at the bottom.
  * @type {shaka.text.Cue.displayAlign}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.displayAlign;
+shaka.extern.Cue.prototype.displayAlign;
 
 
 /**
@@ -251,7 +270,7 @@ shakaExtern.Cue.prototype.displayAlign;
  * @type {!string}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.color;
+shaka.extern.Cue.prototype.color;
 
 
 /**
@@ -261,7 +280,17 @@ shakaExtern.Cue.prototype.color;
  * @type {!string}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.backgroundColor;
+shaka.extern.Cue.prototype.backgroundColor;
+
+
+/**
+ * Image background represented by any string that would be
+ * accepted in image HTML element.
+ * E. g. 'data:[mime type];base64,[data]'.
+ * @type {!string}
+ * @exportDoc
+ */
+shaka.extern.Cue.prototype.backgroundImage;
 
 
 /**
@@ -269,7 +298,7 @@ shakaExtern.Cue.prototype.backgroundColor;
  * @type {string}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.fontSize;
+shaka.extern.Cue.prototype.fontSize;
 
 
 /**
@@ -277,7 +306,7 @@ shakaExtern.Cue.prototype.fontSize;
  * @type {shaka.text.Cue.fontWeight}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.fontWeight;
+shaka.extern.Cue.prototype.fontWeight;
 
 
 /**
@@ -285,7 +314,7 @@ shakaExtern.Cue.prototype.fontWeight;
  * @type {shaka.text.Cue.fontStyle}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.fontStyle;
+shaka.extern.Cue.prototype.fontStyle;
 
 
 /**
@@ -293,7 +322,7 @@ shakaExtern.Cue.prototype.fontStyle;
  * @type {!string}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.fontFamily;
+shaka.extern.Cue.prototype.fontFamily;
 
 
 /**
@@ -302,7 +331,7 @@ shakaExtern.Cue.prototype.fontFamily;
  * @type {!Array.<!shaka.text.Cue.textDecoration>}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.textDecoration;
+shaka.extern.Cue.prototype.textDecoration;
 
 
 /**
@@ -310,7 +339,7 @@ shakaExtern.Cue.prototype.textDecoration;
  * @type {boolean}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.wrapLine;
+shaka.extern.Cue.prototype.wrapLine;
 
 
 /**
@@ -318,8 +347,21 @@ shakaExtern.Cue.prototype.wrapLine;
  * @type {!string}
  * @exportDoc
  */
-shakaExtern.Cue.prototype.id;
+shaka.extern.Cue.prototype.id;
 
+/**
+ * Nested cues
+ * @type {Array.<!shaka.extern.Cue>}
+ * @exportDoc
+ */
+shaka.extern.Cue.prototype.nestedCues;
+
+/**
+ * Whether or not the cue only acts as a spacer between two cues
+ * @type {boolean}
+ * @exportDoc
+ */
+shaka.extern.Cue.prototype.spacer;
 
 
 /**
@@ -328,7 +370,7 @@ shakaExtern.Cue.prototype.id;
  * @interface
  * @exportDoc
  */
-shakaExtern.TextParser = function() {};
+shaka.extern.TextParser = function() {};
 
 
 /**
@@ -350,7 +392,7 @@ shakaExtern.TextParser = function() {};
  *
  * @exportDoc
  */
-shakaExtern.TextParser.TimeContext;
+shaka.extern.TextParser.TimeContext;
 
 
 /**
@@ -362,7 +404,7 @@ shakaExtern.TextParser.TimeContext;
  *
  * @exportDoc
  */
-shakaExtern.TextParser.prototype.parseInit = function(data) {};
+shaka.extern.TextParser.prototype.parseInit = function(data) {};
 
 
 /**
@@ -370,22 +412,21 @@ shakaExtern.TextParser.prototype.parseInit = function(data) {};
  *
  * @param {!Uint8Array} data
  *    The next section of buffer.
- * @param {shakaExtern.TextParser.TimeContext} timeContext
+ * @param {shaka.extern.TextParser.TimeContext} timeContext
  *    The time information that should be used to adjust the times values
  *    for each cue.
- * @return {!Array.<!shakaExtern.Cue>}
+ * @return {!Array.<!shaka.extern.Cue>}
  *
  * @exportDoc
  */
-shakaExtern.TextParser.prototype.parseMedia = function(data, timeContext) {};
+shaka.extern.TextParser.prototype.parseMedia = function(data, timeContext) {};
 
 
 /**
- * @typedef {function(new:shakaExtern.TextParser)}
+ * @typedef {function(new:shaka.extern.TextParser)}
  * @exportDoc
  */
-shakaExtern.TextParserPlugin;
-
+shaka.extern.TextParserPlugin;
 
 
 /**
@@ -395,14 +436,14 @@ shakaExtern.TextParserPlugin;
  * @extends {shaka.util.IDestroyable}
  * @exportDoc
  */
-shakaExtern.TextDisplayer = function() {};
+shaka.extern.TextDisplayer = function() {};
 
 
 /**
  * @override
  * @exportDoc
  */
-shakaExtern.TextDisplayer.prototype.destroy = function() {};
+shaka.extern.TextDisplayer.prototype.destroy = function() {};
 
 
 /**
@@ -413,19 +454,23 @@ shakaExtern.TextDisplayer.prototype.destroy = function() {};
  *
  * @exportDoc
  */
-shakaExtern.TextDisplayer.prototype.append = function(cues) {};
+shaka.extern.TextDisplayer.prototype.append = function(cues) {};
 
 
 /**
- * Remove cues in a given time range.
+ * Remove all cues that are fully contained by the given time range (relative
+ * to the presentation). |endTime| will be greater to equal to |startTime|.
+ * |remove| should only return |false| if the displayer has been destroyed. If
+ * the displayer has not been destroyed |remove| should return |true|.
  *
- * @param {number} startTime relative to the start of the presentation
- * @param {number} endTime relative to the start of the presentation
+ * @param {number} startTime
+ * @param {number} endTime
+ *
  * @return {boolean}
  *
  * @exportDoc
  */
-shakaExtern.TextDisplayer.prototype.remove = function(startTime, endTime) {};
+shaka.extern.TextDisplayer.prototype.remove = function(startTime, endTime) {};
 
 
 /**
@@ -435,7 +480,7 @@ shakaExtern.TextDisplayer.prototype.remove = function(startTime, endTime) {};
  *
  * @exportDoc
  */
-shakaExtern.TextDisplayer.prototype.isTextVisible = function() {};
+shaka.extern.TextDisplayer.prototype.isTextVisible = function() {};
 
 
 /**
@@ -445,13 +490,13 @@ shakaExtern.TextDisplayer.prototype.isTextVisible = function() {};
  *
  * @exportDoc
  */
-shakaExtern.TextDisplayer.prototype.setTextVisibility = function(on) {};
+shaka.extern.TextDisplayer.prototype.setTextVisibility = function(on) {};
 
 
 /**
  * A factory for creating a TextDisplayer.
  *
- * @typedef {function(new:shakaExtern.TextDisplayer)}
+ * @typedef {function(new:shaka.extern.TextDisplayer)}
  * @exportDoc
  */
-shakaExtern.TextDisplayer.Factory;
+shaka.extern.TextDisplayer.Factory;

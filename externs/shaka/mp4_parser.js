@@ -54,4 +54,4 @@
  *   the end will have no affect on the parser reading other sibling boxes.
  * @exportDoc
  */
-shakaExtern.ParsedBox;
+shaka.extern.ParsedBox;

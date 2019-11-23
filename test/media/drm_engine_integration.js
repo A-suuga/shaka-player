@@ -25,12 +25,12 @@ describe('DrmEngine', function() {
   const audioInitSegmentUri = '/base/test/test/assets/multidrm-audio-init.mp4';
   const audioSegmentUri = '/base/test/test/assets/multidrm-audio-segment.mp4';
 
-  /** @type {!Object.<string, ?shakaExtern.DrmSupportType>} */
+  /** @type {!Object.<string, ?shaka.extern.DrmSupportType>} */
   let support = {};
 
   /** @type {!HTMLVideoElement} */
   let video;
-  /** @type {shakaExtern.Manifest} */
+  /** @type {shaka.extern.Manifest} */
   let manifest;
 
   /** @type {!jasmine.Spy} */
@@ -60,32 +60,28 @@ describe('DrmEngine', function() {
   /** @type {!ArrayBuffer} */
   let audioSegment;
 
-  beforeAll(function(done) {
+  beforeAll(async () => {
     let supportTest = shaka.media.DrmEngine.probeSupport()
         .then(function(result) { support = result; })
         .catch(fail);
 
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
-    Promise.all([
+    let responses = await Promise.all([
       supportTest,
       shaka.test.Util.fetch(videoInitSegmentUri),
       shaka.test.Util.fetch(videoSegmentUri),
       shaka.test.Util.fetch(audioInitSegmentUri),
-      shaka.test.Util.fetch(audioSegmentUri)
-    ]).then(function(responses) {
-      videoInitSegment = responses[1];
-      videoSegment = responses[2];
-      audioInitSegment = responses[3];
-      audioSegment = responses[4];
-    }).catch(fail).then(done);
+      shaka.test.Util.fetch(audioSegmentUri),
+    ]);
+    videoInitSegment = responses[1];
+    videoSegment = responses[2];
+    audioInitSegment = responses[3];
+    audioSegment = responses[4];
   });
 
-  beforeEach(function(done) {
+  beforeEach(async () => {
     onErrorSpy = jasmine.createSpy('onError');
     onKeyStatusSpy = jasmine.createSpy('onKeyStatus');
     onExpirationSpy = jasmine.createSpy('onExpirationUpdated');
@@ -100,7 +96,7 @@ describe('DrmEngine', function() {
         'IjoiNjllNTQwODgtZTllMC00NTMwLThjMWEtMWViNmRjZDBkMTRlIiwibWVzc2FnZSI6e',
         'yJ0eXBlIjoiZW50aXRsZW1lbnRfbWVzc2FnZSIsImtleXMiOlt7ImlkIjoiNmU1YTFkMj',
         'YtMjc1Ny00N2Q3LTgwNDYtZWFhNWQxZDM0YjVhIn1dfX0.yF7PflOPv9qHnu3ZWJNZ12j',
-        'gkqTabmwXbDWk_47tLNE'
+        'gkqTabmwXbDWk_47tLNE',
       ].join('');
     });
 
@@ -109,22 +105,15 @@ describe('DrmEngine', function() {
       onError: shaka.test.Util.spyFunc(onErrorSpy),
       onKeyStatus: shaka.test.Util.spyFunc(onKeyStatusSpy),
       onExpirationUpdated: shaka.test.Util.spyFunc(onExpirationSpy),
-      onEvent: shaka.test.Util.spyFunc(onEventSpy)
+      onEvent: shaka.test.Util.spyFunc(onEventSpy),
     };
 
     drmEngine = new shaka.media.DrmEngine(playerInterface);
-    let config = {
-      retryParameters: shaka.net.NetworkingEngine.defaultRetryParameters(),
-      clearKeys: {},
-      delayLicenseRequestUntilPlayed: false,
-      advanced: {},
-      servers: {
-        'com.widevine.alpha':
-            'https://drm-widevine-licensing.axtest.net/AcquireLicense',
-        'com.microsoft.playready':
-            'https://drm-playready-licensing.axtest.net/AcquireLicense'
-      }
-    };
+    const config = shaka.util.PlayerConfiguration.createDefault().drm;
+    config.servers['com.widevine.alpha'] =
+        'https://drm-widevine-licensing.axtest.net/AcquireLicense';
+    config.servers['com.microsoft.playready'] =
+        'https://drm-playready-licensing.axtest.net/AcquireLicense';
     drmEngine.configure(config);
 
     manifest = new shaka.test.ManifestGenerator()
@@ -141,22 +130,22 @@ describe('DrmEngine', function() {
 
     eventManager = new shaka.util.EventManager();
 
-    mediaSourceEngine = new shaka.media.MediaSourceEngine(video);
+    mediaSourceEngine = new shaka.media.MediaSourceEngine(
+        video,
+        new shaka.test.FakeClosedCaptionParser(),
+        new shaka.test.FakeTextDisplayer());
 
-    // Create empty object first and initialize the fields through
-    // [] to allow field names to be expressions.
-    let expectedObject = {};
-    expectedObject[ContentType.AUDIO] = audioStream;
-    expectedObject[ContentType.VIDEO] = videoStream;
-    mediaSourceEngine.init(expectedObject, false).then(done);
+    const expectedObject = new Map();
+    expectedObject.set(ContentType.AUDIO, audioStream);
+    expectedObject.set(ContentType.VIDEO, videoStream);
+    await mediaSourceEngine.init(expectedObject, false);
   });
 
-  afterEach(async function() {
-    await Promise.all([
-      eventManager.destroy(),
-      mediaSourceEngine.destroy(),
-      networkingEngine.destroy(),
-    ]);
+  afterEach(async () => {
+    eventManager.release();
+
+    await mediaSourceEngine.destroy();
+    await networkingEngine.destroy();
     await drmEngine.destroy();
   });
 
@@ -165,7 +154,7 @@ describe('DrmEngine', function() {
   });
 
   describe('basic flow', function() {
-    drm_it('gets a license and can play encrypted segments',
+    drmIt('gets a license and can play encrypted segments',
         checkAndRun((done) => {
           // The error callback should not be invoked.
           onErrorSpy.and.callFake(fail);
@@ -201,16 +190,18 @@ describe('DrmEngine', function() {
             keyStatusEventSeen.resolve();
           });
 
-          drmEngine.init(manifest, /* offline */ false).then(function() {
+          const periods = manifest.periods;
+          const variants = shaka.util.Periods.getAllVariantsFrom(periods);
+
+          drmEngine.initForPlayback(
+              variants, manifest.offlineSessionIds).then(function() {
             return drmEngine.attach(video);
           }).then(function() {
             return mediaSourceEngine.appendBuffer(ContentType.VIDEO,
-                                                  videoInitSegment,
-                                                  null, null);
+                videoInitSegment, null, null, /* hasClosedCaptions */ false);
           }).then(function() {
             return mediaSourceEngine.appendBuffer(ContentType.AUDIO,
-                                                  audioInitSegment,
-                                                  null, null);
+                audioInitSegment, null, null, /* hasClosedCaptions */ false);
           }).then(function() {
             return encryptedEventSeen;
           }).then(function() {
@@ -245,12 +236,10 @@ describe('DrmEngine', function() {
             }
 
             return mediaSourceEngine.appendBuffer(ContentType.VIDEO,
-                                                  videoSegment,
-                                                  null, null);
+                videoSegment, null, null, /* hasClosedCaptions */ false);
           }).then(function() {
             return mediaSourceEngine.appendBuffer(ContentType.AUDIO,
-                                                  audioSegment,
-                                                  null, null);
+                audioSegment, null, null, /* hasClosedCaptions */ false);
           }).then(function() {
             expect(video.buffered.end(0)).toBeGreaterThan(0);
             video.play();

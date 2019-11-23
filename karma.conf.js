@@ -44,7 +44,7 @@ module.exports = function(config) {
 
   // Find the settings JSON object in the command arguments
   var args = process.argv;
-  var settingsIndex = args.indexOf('--settings')
+  var settingsIndex = args.indexOf('--settings');
   var settings = settingsIndex >= 0 ? JSON.parse(args[settingsIndex + 1]) : {};
 
   if (settings.browsers && settings.browsers.length == 1 &&
@@ -64,9 +64,8 @@ module.exports = function(config) {
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
     frameworks: [
-      'jasmine-ajax', 'jasmine',
-      // Fixes backtraces after Babel preprocessing
-      'source-map-support',
+      'jasmine-ajax',
+      'jasmine',
     ],
 
     plugins: [
@@ -82,7 +81,7 @@ module.exports = function(config) {
       'node_modules/babel-polyfill/dist/polyfill.js',
 
       // muxjs module next
-      'node_modules/mux.js/dist/mux.js',
+      'node_modules/mux.js/dist/mux.min.js',
 
       // load closure base, the deps tree, and the uncompiled library
       'third_party/closure/goog/base.js',
@@ -99,17 +98,28 @@ module.exports = function(config) {
       'test/test/util/*.js',
 
       // list of test assets next
+      'demo/common/asset.js',
       'demo/common/assets.js',
 
       // if --test-custom-asset *is not* present, we will add unit tests.
       // if --quick *is not* present, we will add integration tests.
       // if --external *is* present, we will add external asset tests.
 
+      // load relevant demo files
+      {
+        pattern: 'demo/!(main|load|demo_uncompiled|service_worker).js',
+        included: true,
+      },
+
       // source files - these are only watched and served
       {pattern: 'lib/**/*.js', included: false},
+      {pattern: 'ui/**/*.js', included: false},
+      {pattern: 'ui/**/*.less', included: false},
       {pattern: 'third_party/closure/goog/**/*.js', included: false},
+      {pattern: 'third_party/language-mapping-list/*.js', included: false},
       {pattern: 'test/test/assets/*', included: false},
-      {pattern: 'dist/shaka-player.compiled.js', included: false},
+      {pattern: 'dist/shaka-player.ui.js', included: false},
+      {pattern: 'dist/locales.js', included: false},
       {pattern: 'node_modules/**/*.js', included: false},
     ],
 
@@ -118,26 +128,35 @@ module.exports = function(config) {
     proxies: {},
 
     preprocessors: {
-      // Compute coverage over everything but lib/debug/ or lib/polyfill/
-      'lib/!(debug|polyfill)/*.js': ['coverage'],
-      // Player is not matched by the above, so add it explicitly
-      'lib/player.js': ['coverage'],
-
-      // Convert ES6 to ES5 so we can still run tests on IE11.
-      'lib/**/*.js': ['babel'],
-      'test/**/*.js': ['babel'],
+      // Use babel to convert ES6 to ES5 so we can still run tests everywhere.
+      // Use sourcemap to read inline source maps from babel into karma.
+      'demo/**/*.js': ['babel', 'sourcemap'],
+      'lib/**/*.js': ['babel', 'sourcemap'],
+      'ui/**/*.js': ['babel', 'sourcemap'],
+      'test/**/*.js': ['babel', 'sourcemap'],
+      'third_party/language-mapping-list/*.js': ['babel', 'sourcemap'],
     },
 
     babelPreprocessor: {
       options: {
-        presets: [
-          // Some of our tests are not written with strict mode in mind, but the
-          // plugin for commonjs modules enforces strict mode.  Since we do not
-          // use modules, just disable them.
-          ['env', { modules: false }],
-        ],
-        // The source-map-support framework is necessary to make this work:
+        presets: ['env'],
+        // Add source maps so that backtraces refer to the original code.
+        // Babel will output inline source maps, and the 'sourcemap'
+        // preprocessor will read them and feed them to Karma.  Karma will then
+        // use them to reformat stack traces in errors.
         sourceMap: 'inline',
+        // Add instrumentation for code coverage.
+        plugins: [
+          ['istanbul', {
+            // Don't instrument these parts of the codebase.
+            exclude: [
+              'demo/**/*.js',
+              'lib/(debug|deprecate|polyfill)/*.js',
+              'test/**/*.js',
+              'third_party/**/*.js',
+            ],
+          }],
+        ],
       },
     },
 
@@ -183,6 +202,9 @@ module.exports = function(config) {
         // Run playback tests on a custom manifest URI.
         testCustomAsset: settings.test_custom_asset,
         testCustomLicenseServer: settings.test_custom_license_server,
+
+        // Overrides the default test timeout value.
+        testTimeout: settings.test_timeout,
       }],
     },
 
@@ -247,7 +269,7 @@ module.exports = function(config) {
     }
     if (settings.external) {
       // If --external is present, we serve external asset tests.
-      config.files.push('test/player_external.js');
+      config.files.push('test/**/*_external.js');
     }
   }
   // We just modified the config in-place.  No need for config.set() after we

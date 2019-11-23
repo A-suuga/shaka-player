@@ -39,12 +39,12 @@ function getClientArg(name) {
    * A version of assert() which hooks into jasmine and converts all failed
    * assertions into failed tests.
    * @param {*} condition
-   * @param {string=} opt_message
+   * @param {string=} message
    */
-  function jasmineAssert(condition, opt_message) {
-    realAssert(condition, opt_message);
+  function jasmineAssert(condition, message) {
+    realAssert(condition, message);
     if (!condition) {
-      let message = opt_message || 'Assertion failed.';
+      message = message || 'Assertion failed.';
       console.error(message);
       try {
         throw new Error(message);
@@ -102,8 +102,10 @@ function getClientArg(name) {
   // the first time it needs to schedule something.
   Promise.resolve().then(function() {});
 
-  // Set the default timeout to 120s for all asynchronous tests.
-  jasmine.DEFAULT_TIMEOUT_INTERVAL = 120 * 1000;
+  const timeout = getClientArg('testTimeout');
+  if (timeout) {
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = Number(timeout);
+  }
 
   let logLevel = getClientArg('logLevel');
   if (logLevel) {
@@ -156,7 +158,7 @@ function getClientArg(name) {
    * @param {string} name
    * @param {jasmine.Callback} callback
    */
-  window.drm_it = function(name, callback) {
+  window.drmIt = function(name, callback) {
     it(name, filterShim(callback, 'drm',
         'Skipping tests that use a DRM license server.'));
   };
@@ -167,7 +169,7 @@ function getClientArg(name) {
    * @param {string} name
    * @param {jasmine.Callback} callback
    */
-  window.quarantined_it = function(name, callback) {
+  window.quarantinedIt = function(name, callback) {
     it(name, filterShim(callback, 'quarantined',
         'Skipping tests that are quarantined.'));
   };
@@ -189,13 +191,22 @@ function getClientArg(name) {
           name: 'sprintf-js',
           main: 'src/sprintf',
         },
+        {
+          name: 'less',
+          main: 'dist/less',
+        },
       ],
     });
 
     // Load required AMD modules, then proceed with tests.
-    require(['promise-mock', 'sprintf-js'], (PromiseMock, sprintfJs) => {
-      window.PromiseMock = PromiseMock;
-      window.sprintf = sprintfJs.sprintf;
+    require(['promise-mock', 'sprintf-js', 'less'],
+        (PromiseMock, sprintfJs, less) => {
+      // These external interfaces are declared as "const" in the externs.
+      // Avoid "const"-ness complaints from the compiler by assigning these
+      // using bracket notation.
+      window['PromiseMock'] = PromiseMock;
+      window['sprintf'] = sprintfJs.sprintf;
+      window['less'] = less;
 
       // Patch a new convenience method into PromiseMock.
       // See https://github.com/taylorhakes/promise-mock/issues/7
@@ -208,12 +219,31 @@ function getClientArg(name) {
     });
   });
 
+  const originalSetTimeout = window.setTimeout;
   const delayTests = getClientArg('delayTests');
   if (delayTests) {
-    const originalSetTimeout = window.setTimeout;
     afterEach((done) => {
-      console.log('DELAYING...');
+      console.log('Delaying test by ' + delayTests + ' seconds...');
       originalSetTimeout(done, delayTests * 1000);
     });
   }
+
+  // Work-around: allow the Tizen media pipeline to cool down.
+  // Without this, Tizen's pipeline seems to hang in subsequent tests.
+  // TODO: file a bug on Tizen
+  if (shaka.util.Platform.isTizen()) {
+    afterEach((done) => {
+      originalSetTimeout(done, 100 /* ms */);
+    });
+  }
+
+  // Code in karma-jasmine's adapter will malform test failures when the
+  // expectation message contains a stack trace, losing the failure message and
+  // mixing up the stack trace of the failure.  To avoid this, we modify
+  // shaka.util.Error not to create a stack trace.  This trace is not available
+  // in production, and there is never any need for it in the tests.
+  // Shimming shaka.util.Error proved too complicated because of a combination
+  // of compiler restrictions and ES6 language features, so this is by far the
+  // simpler answer.
+  shaka.util.Error.createStack = false;
 })();

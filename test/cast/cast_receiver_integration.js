@@ -43,11 +43,7 @@ describe('CastReceiver', function() {
   let toRestore;
   let pendingWaitWrapperCalls = 0;
 
-  /** @type {boolean} */
-  let isChrome;
-  /** @type {boolean} */
-  let isChromecast;
-  /** @type {!Object.<string, ?shakaExtern.DrmSupportType>} */
+  /** @type {!Object.<string, ?shaka.extern.DrmSupportType>} */
   let support = {};
 
   let fakeInitState;
@@ -56,18 +52,22 @@ describe('CastReceiver', function() {
    * Before running the test, check if this is Chrome or Chromecast, and maybe
    * if Widevine is supported.
    * @param {function(function()=)} test
-   * @param {boolean=} opt_checkKeySystems
+   * @param {boolean=} checkKeySystems
    * @return {function(function())}
    */
-  function checkAndRun(test, opt_checkKeySystems) {
+  function checkAndRun(test, checkKeySystems) {
+    const Platform = shaka.util.Platform;
+
     let check = function(done) {
-      if (opt_checkKeySystems && !support['com.widevine.alpha']) {
+      if (checkKeySystems && !support['com.widevine.alpha']) {
         pending('Skipping DrmEngine tests.');
-      } else if (!isChromecast && !isChrome) {
+      } else if (Platform.isChromecast()) {
+        test(done);
+      } else if (Platform.isChrome()) {
+        test(done);
+      } else {
         pending(
             'Skipping CastReceiver tests for non-Chrome and non-Chromecast');
-      } else {
-        test(done);
       }
     };
     // Account for tests with a done argument, and tests without.
@@ -84,7 +84,7 @@ describe('CastReceiver', function() {
   * @return {function(function())}
   */
  function checkAndRunWithDrm(test) {
-   return checkAndRun(test, /* opt_checkKeySystems */ true);
+   return checkAndRun(test, /* checkKeySystems */ true);
  }
 
   beforeAll(function(done) {
@@ -96,13 +96,10 @@ describe('CastReceiver', function() {
     // ability to use modern APIs there that may not be available on all of the
     // browsers our library supports.  Because of this, CastReceiver tests will
     // only be run on Chrome and Chromecast.
-    isChromecast = navigator.userAgent.indexOf('CrKey') >= 0;
-    let isEdge = navigator.userAgent.indexOf('Edge/') >= 0;
-    // Edge also has "Chrome/" in its user agent string.
-    isChrome = navigator.userAgent.indexOf('Chrome/') >= 0 && !isEdge;
-
-    // Don't do any more work here if the tests will not end up running.
-    if (!isChromecast && !isChrome) return;
+    const Platform = shaka.util.Platform;
+    if (!(Platform.isChromecast() || Platform.isChrome())) {
+      return;
+    }
 
     // In uncompiled mode, there is a UA check for Chromecast in order to make
     // manual testing easier.  For these automated tests, we want to act as if
@@ -132,17 +129,15 @@ describe('CastReceiver', function() {
     // don't need this mock strictly type-checked.
     window['cast'] = {
       receiver: mockReceiverApi,
-      __platform__: {canDisplayType: mockCanDisplayType}
+      __platform__: {canDisplayType: mockCanDisplayType},
     };
 
     mockReceiverManager = createMockReceiverManager();
     mockShakaMessageBus = createMockMessageBus();
     mockGenericMessageBus = createMockMessageBus();
 
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
+
     document.body.appendChild(video);
 
     player = new shaka.Player(video);
@@ -153,17 +148,17 @@ describe('CastReceiver', function() {
 
     fakeInitState = {
       player: {
-        configure: {}
+        configure: {},
       },
       playerAfterLoad: {
-        setTextTrackVisibility: true
+        setTextTrackVisibility: true,
       },
       video: {
         loop: true,
-        playbackRate: 5
+        playbackRate: 5,
       },
       manifest: 'test:sintel_no_text',
-      startTime: 0
+      startTime: 0,
     };
   }));
 
@@ -191,7 +186,7 @@ describe('CastReceiver', function() {
     }
   });
 
-  drm_it('sends reasonably-sized updates', checkAndRunWithDrm((done) => {
+  drmIt('sends reasonably-sized updates', checkAndRunWithDrm((done) => {
     // Use an encrypted asset, to make sure DRM info doesn't balloon the size.
     fakeInitState.manifest = 'test:sintel-enc';
 
@@ -211,11 +206,11 @@ describe('CastReceiver', function() {
     fakeIncomingMessage({
       type: 'init',
       initState: fakeInitState,
-      appData: {}
+      appData: {},
     }, mockShakaMessageBus);
   }));
 
-  drm_it('has a reasonable average message size', checkAndRunWithDrm((done) => {
+  drmIt('has a reasonable average message size', checkAndRunWithDrm((done) => {
     // Use an encrypted asset, to make sure DRM info doesn't balloon the size.
     fakeInitState.manifest = 'test:sintel-enc';
 
@@ -244,7 +239,7 @@ describe('CastReceiver', function() {
     fakeIncomingMessage({
       type: 'init',
       initState: fakeInitState,
-      appData: {}
+      appData: {},
     }, mockShakaMessageBus);
   }));
 
@@ -253,15 +248,15 @@ describe('CastReceiver', function() {
     // at each stage, the cast receiver can form an update message without
     // causing an error.
     waitForUpdateMessageWrapper(
-        shaka.media.ManifestParser, 'ManifestParser', 'getFactory');
+        shaka.media.ManifestParser, 'ManifestParser', 'create');
     waitForUpdateMessageWrapper(shaka.test.TestScheme.ManifestParser.prototype,
         'ManifestParser', 'start');
     waitForUpdateMessageWrapper(
-        shaka.media.DrmEngine.prototype, 'DrmEngine', 'init');
+        shaka.media.DrmEngine.prototype, 'DrmEngine', 'initForPlayback');
     waitForUpdateMessageWrapper(
         shaka.media.DrmEngine.prototype, 'DrmEngine', 'attach');
     waitForUpdateMessageWrapper(
-        shaka.media.StreamingEngine.prototype, 'StreamingEngine', 'init');
+        shaka.media.StreamingEngine.prototype, 'StreamingEngine', 'start');
 
     eventManager.listenOnce(video, 'loadeddata', function() {
       // Make sure that each of the methods covered by
@@ -278,7 +273,7 @@ describe('CastReceiver', function() {
     fakeIncomingMessage({
       type: 'init',
       initState: fakeInitState,
-      appData: {}
+      appData: {},
     }, mockShakaMessageBus);
   }));
 
@@ -325,8 +320,8 @@ describe('CastReceiver', function() {
   function createMockReceiverApi() {
     return {
       CastReceiverManager: {
-        getInstance: function() { return mockReceiverManager; }
-      }
+        getInstance: function() { return mockReceiverManager; },
+      },
     };
   }
 
@@ -346,7 +341,7 @@ describe('CastReceiver', function() {
         }
 
         return mockGenericMessageBus;
-      }
+      },
     };
   }
 
@@ -354,7 +349,7 @@ describe('CastReceiver', function() {
     let bus = {
       messages: [],
       broadcast: jasmine.createSpy('CastMessageBus.broadcast'),
-      getCastChannel: jasmine.createSpy('CastMessageBus.getCastChannel')
+      getCastChannel: jasmine.createSpy('CastMessageBus.getCastChannel'),
     };
     // For convenience, deserialize and store sent messages.
     bus.broadcast.and.callFake(function(message) {
@@ -371,7 +366,7 @@ describe('CastReceiver', function() {
       messages: [],
       send: function(message) {
         channel.messages.push(CastUtils.deserialize(message));
-      }
+      },
     };
     bus.getCastChannel.and.returnValue(channel);
     return bus;
@@ -393,13 +388,13 @@ describe('CastReceiver', function() {
   /**
    * @param {?} message
    * @param {!Object} bus
-   * @param {string=} opt_senderId
+   * @param {string=} senderId
    */
-  function fakeIncomingMessage(message, bus, opt_senderId) {
+  function fakeIncomingMessage(message, bus, senderId) {
     let serialized = CastUtils.serialize(message);
     let messageEvent = {
-      senderId: opt_senderId,
-      data: serialized
+      senderId: senderId,
+      data: serialized,
     };
     bus.onMessage(messageEvent);
   }

@@ -16,48 +16,70 @@
  */
 
 
-/** @externs */
+/**
+ * @externs
+ */
 
+
+/**
+ * @typedef {{
+ *   hasAppRestrictions: boolean,
+ *   missingKeys: !Array.<string>,
+ *   restrictedKeyStatuses: !Array.<string>
+ * }}
+ *
+ * @property {boolean} hasAppRestrictions
+ *   Whether there are streams that are restricted due to app-provided
+ *   restrictions.
+ * @property {!Array.<string>} missingKeys
+ *   The key IDs that were missing.
+ * @property {!Array.<string>} restrictedKeyStatuses
+ *   The restricted EME key statuses that the streams had.  For example,
+ *   'output-restricted' would mean streams couldn't play due to restrictions
+ *   on the output device (e.g. HDCP).
+ * @exportDoc
+ */
+shaka.extern.RestrictionInfo;
 
 
 /**
  * @interface
  * @exportDoc
  */
-shakaExtern.Error = function() {};
+shaka.extern.Error = function() {};
 
 
 /**
  * @type {shaka.util.Error.Severity}
  * @exportDoc
  */
-shakaExtern.Error.prototype.severity;
+shaka.extern.Error.prototype.severity;
 
 
 /**
  * @const {shaka.util.Error.Category}
  * @exportDoc
  */
-shakaExtern.Error.prototype.category;
+shaka.extern.Error.prototype.category;
 
 
 /**
  * @const {shaka.util.Error.Code}
  * @exportDoc
  */
-shakaExtern.Error.prototype.code;
+shaka.extern.Error.prototype.code;
 
 
 /**
  * @const {!Array.<*>}
  * @exportDoc
  */
-shakaExtern.Error.prototype.data;
+shaka.extern.Error.prototype.data;
 
 
 /**
  * @type {boolean}
  * @exportDoc
  */
-shakaExtern.Error.prototype.handled;
+shaka.extern.Error.prototype.handled;
 

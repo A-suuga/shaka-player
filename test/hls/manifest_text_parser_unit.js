@@ -42,11 +42,16 @@ describe('ManifestTextParser', function() {
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6')
-            ]
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6'),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-TARGETDURATION:6\n');
+          '#EXT-X-TARGETDURATION:6\n',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('parses a Master Playlist', function() {
@@ -58,14 +63,19 @@ describe('ManifestTextParser', function() {
               new shaka.hls.Tag(/* id */ 1, 'EXT-X-STREAM-INF',
                   [
                     new shaka.hls.Attribute('BANDWIDTH', '2165224'),
-                    new shaka.hls.Attribute('URI', 'prog_index.m3u8')
-                  ])
-            ]
+                    new shaka.hls.Attribute('URI', 'prog_index.m3u8'),
+                  ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
           '#EXT-X-TARGETDURATION:6\n' +
           '#EXT-X-STREAM-INF:BANDWIDTH=2165224\n' +
-          'prog_index.m3u8');
+          'prog_index.m3u8',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('ignores comments', function() {
@@ -73,12 +83,17 @@ describe('ManifestTextParser', function() {
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6')
-            ]
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6'),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
           '#Comment\n' +
-          '#EXT-X-TARGETDURATION:6');
+          '#EXT-X-TARGETDURATION:6',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     /**
@@ -106,31 +121,46 @@ describe('ManifestTextParser', function() {
           {
             type: shaka.hls.PlaylistType.MASTER,
             tags: [
-              new shaka.hls.Tag(/* id */ 0, 'EXT-X-INDEPENDENT-SEGMENTS', [])
-            ]
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-INDEPENDENT-SEGMENTS', []),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-INDEPENDENT-SEGMENTS');
+          '#EXT-X-INDEPENDENT-SEGMENTS',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
 
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 1, 'EXT-X-PLAYLIST-TYPE', [], 'VOD')
-            ]
+              new shaka.hls.Tag(/* id */ 1, 'EXT-X-PLAYLIST-TYPE', [], 'VOD'),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-PLAYLIST-TYPE:VOD');
+          '#EXT-X-PLAYLIST-TYPE:VOD',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
 
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 2, 'EXT-X-MEDIA-SEQUENCE', [], '1')
-            ]
+              new shaka.hls.Tag(/* id */ 2, 'EXT-X-MEDIA-SEQUENCE', [], '1'),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-MEDIA-SEQUENCE:1');
+          '#EXT-X-MEDIA-SEQUENCE:1',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('parses tags with attributes', function() {
@@ -139,11 +169,16 @@ describe('ManifestTextParser', function() {
             type: shaka.hls.PlaylistType.MASTER,
             tags: [
               new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA',
-                  [new shaka.hls.Attribute('TYPE', 'CLOSED-CAPTIONS')])
-            ]
+                  [new shaka.hls.Attribute('TYPE', 'CLOSED-CAPTIONS')]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS');
+          '#EXT-X-MEDIA:TYPE=CLOSED-CAPTIONS',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
 
       verifyPlaylist(
           {
@@ -152,12 +187,17 @@ describe('ManifestTextParser', function() {
               new shaka.hls.Tag(/* id */ 1, 'EXT-X-MEDIA',
                   [
                     new shaka.hls.Attribute('URI', 'main.mp4'),
-                    new shaka.hls.Attribute('BYTERANGE', '720@0')
-                  ])
-            ]
+                    new shaka.hls.Attribute('BYTERANGE', '720@0'),
+                  ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-MEDIA:URI="main.mp4",BYTERANGE="720@0"');
+          '#EXT-X-MEDIA:URI="main.mp4",BYTERANGE="720@0"',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('parses tags with commas in attribute values', function() {
@@ -167,12 +207,17 @@ describe('ManifestTextParser', function() {
             tags: [
               new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA',
                   [
-                    new shaka.hls.Attribute('CODECS', 'avc1.64002a,mp4a.40.2')
-                  ])
-            ]
+                    new shaka.hls.Attribute('CODECS', 'avc1.64002a,mp4a.40.2'),
+                  ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2"');
+          '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2"',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
 
       verifyPlaylist(
           {
@@ -181,12 +226,17 @@ describe('ManifestTextParser', function() {
               new shaka.hls.Tag(/* id */ 1, 'EXT-X-MEDIA',
                   [
                     new shaka.hls.Attribute('CODECS',
-                                            'avc1.64002a,mp4a.40.2,avc2.64000')
-                  ])
-            ]
+                                            'avc1.64002a,mp4a.40.2,avc2.64000'),
+                  ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2,avc2.64000"');
+          '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2,avc2.64000"',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
 
       verifyPlaylist(
           {
@@ -196,12 +246,17 @@ describe('ManifestTextParser', function() {
                   [
                     new shaka.hls.Attribute('CODECS',
                                             'avc1.64002a,mp4a.40.2'),
-                    new shaka.hls.Attribute('AUDIO', 'a1,a2')
-                  ])
-            ]
+                    new shaka.hls.Attribute('AUDIO', 'a1,a2'),
+                  ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
-          '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2",AUDIO="a1,a2"');
+          '#EXT-X-MEDIA:CODECS="avc1.64002a,mp4a.40.2",AUDIO="a1,a2"',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('rejects invalid tags', function() {
@@ -238,6 +293,12 @@ describe('ManifestTextParser', function() {
       let tag = shaka.hls.ManifestTextParser.parseTag(0, text);
       expect(text).toEqual(tag.toString());
     });
+
+    it('recreates valid tag with both value and attributes', function() {
+      const text = '#EXTINF:5.99467,pid=180';
+      let tag = shaka.hls.ManifestTextParser.parseTag(0, text);
+      expect(text).toEqual(tag.toString());
+    });
   });
 
   describe('parseSegments', function() {
@@ -246,19 +307,54 @@ describe('ManifestTextParser', function() {
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA-SEQUENCE', [], '1')
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA-SEQUENCE', [], '1'),
             ],
             segments: [
               new shaka.hls.Segment('https://test/test.mp4',
                   [
-                    new shaka.hls.Tag(/* id */ 2, 'EXTINF', [], '5.99467')
-                  ])
-            ]
+                    new shaka.hls.Tag(/* id */ 2, 'EXTINF', [], '5.99467'),
+                  ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
           '#EXT-X-MEDIA-SEQUENCE:1\n' +
           '#EXTINF:5.99467\n' +
-          'https://test/test.mp4\n');
+          'https://test/test.mp4\n',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
+    });
+
+    it('handles tags with both value and attributes', function() {
+      verifyPlaylist(
+          {
+            type: shaka.hls.PlaylistType.MEDIA,
+            tags: [
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA-SEQUENCE', [], '1'),
+            ],
+            segments: [
+              new shaka.hls.Segment('https://test/test.mp4',
+                  [
+                    new shaka.hls.Tag(
+                      /* id */ 2,
+                      'EXTINF',
+                      [new shaka.hls.Attribute('pid', '180')],
+                      '5.99467'
+                    ),
+                  ]),
+            ],
+          },
+
+          // playlist text:
+          '#EXTM3U\n' +
+          '#EXT-X-MEDIA-SEQUENCE:1\n' +
+          '#EXTINF:5.99467,pid=180\n' +
+          'https://test/test.mp4\n',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('handles manifests with a segment tag before a playlist tag', () => {
@@ -266,7 +362,7 @@ describe('ManifestTextParser', function() {
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 2, 'EXT-X-TARGETDURATION', [], '6')
+              new shaka.hls.Tag(/* id */ 2, 'EXT-X-TARGETDURATION', [], '6'),
             ],
             segments: [
               new shaka.hls.Segment('https://test/test.mp4',
@@ -275,39 +371,46 @@ describe('ManifestTextParser', function() {
                     [
                       new shaka.hls.Attribute('METHOD', 'AES-128'),
                       new shaka.hls.Attribute('URI', 'http://key.com'),
-                      new shaka.hls.Attribute('IV', '123')
+                      new shaka.hls.Attribute('IV', '123'),
                     ]),
-                  new shaka.hls.Tag(/* id */ 3, 'EXTINF', [], '5.99467')
-                ])
-            ]
+                  new shaka.hls.Tag(/* id */ 3, 'EXTINF', [], '5.99467'),
+                ]),
+            ],
           },
+
+          // playlist text:
           '#EXTM3U\n' +
           '#EXT-X-KEY:METHOD="AES-128",URI="http://key.com",IV="123"\n' +
           '#EXT-X-TARGETDURATION:6\n' +
           '#EXTINF:5.99467\n' +
-          'https://test/test.mp4\n');
+          'https://test/test.mp4\n',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
 
     it('tracks playlist URI', function() {
       verifyPlaylist(
           {
-            uri: 'https://test/manifest.m3u8',
+            absoluteUri: 'https://test/manifest.m3u8',
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA-SEQUENCE', [], '1')
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-MEDIA-SEQUENCE', [], '1'),
             ],
             segments: [
-              new shaka.hls.Segment('test.mp4',
+              new shaka.hls.Segment('https://test/test.mp4',
                   [
-                    new shaka.hls.Tag(/* id */ 2, 'EXTINF', [], '5.99467')
-                  ])
-            ]
+                    new shaka.hls.Tag(/* id */ 2, 'EXTINF', [], '5.99467'),
+                  ]),
+            ],
           },
+
           // playlist text:
           '#EXTM3U\n' +
           '#EXT-X-MEDIA-SEQUENCE:1\n' +
           '#EXTINF:5.99467\n' +
           'test.mp4\n',
+
           // manifest URI:
           'https://test/manifest.m3u8');
     });
@@ -326,48 +429,57 @@ describe('ManifestTextParser', function() {
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
-              new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6')
+              new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6'),
             ],
             segments: [
-              new shaka.hls.Segment('uri',
+              new shaka.hls.Segment('https://test/uri',
                                     [new shaka.hls.Tag(2, 'EXTINF', [], '5')]),
-              new shaka.hls.Segment('uri2',
-                                    [new shaka.hls.Tag(3, 'EXTINF', [], '4')])
-            ]
+              new shaka.hls.Segment('https://test/uri2',
+                                    [new shaka.hls.Tag(3, 'EXTINF', [], '4')]),
+            ],
           },
-          manifestText);
+
+          manifestText,
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
+
     it('identifies playlist tags', function() {
       verifyPlaylist(
           {
             type: shaka.hls.PlaylistType.MEDIA,
             tags: [
               new shaka.hls.Tag(/* id */ 0, 'EXT-X-TARGETDURATION', [], '6'),
-              new shaka.hls.Tag(/* id */ 4, 'EXT-X-ENDLIST', [])
+              new shaka.hls.Tag(/* id */ 4, 'EXT-X-ENDLIST', []),
             ],
             segments: [
-              new shaka.hls.Segment('uri',
+              new shaka.hls.Segment('https://test/uri',
                                     [new shaka.hls.Tag(2, 'EXTINF', [], '5')]),
-              new shaka.hls.Segment('uri2',
-                                    [new shaka.hls.Tag(3, 'EXTINF', [], '4')])
-            ]
+              new shaka.hls.Segment('https://test/uri2',
+                                    [new shaka.hls.Tag(3, 'EXTINF', [], '4')]),
+            ],
           },
+
           // Append a playlist tag to the manifest text so it appears after
           // segment-related tags.
-          manifestText + '#EXT-X-ENDLIST');
+          manifestText + '#EXT-X-ENDLIST',
+
+          // manifest URI:
+          'https://test/manifest.m3u8');
     });
   });
 
-
+  // TODO(#1672): Get a better type than "Object" here.
   /**
    * @param {Object} expectedPlaylist
    * @param {string} playlistText
-   * @param {string=} opt_manifestUri
+   * @param {string} absoluteManifestUri
    */
-  function verifyPlaylist(expectedPlaylist, playlistText, opt_manifestUri) {
-    let manifestUri = opt_manifestUri || '';
-    let playlistBuffer = shaka.util.StringUtils.toUTF8(playlistText);
-    let actualPlaylist = parser.parsePlaylist(playlistBuffer, manifestUri);
+  function verifyPlaylist(expectedPlaylist, playlistText, absoluteManifestUri) {
+    const playlistBuffer = shaka.util.StringUtils.toUTF8(playlistText);
+    const actualPlaylist =
+        parser.parsePlaylist(playlistBuffer, absoluteManifestUri);
 
     expect(actualPlaylist).toBeTruthy();
     expect(actualPlaylist.type).toEqual(expectedPlaylist.type);
@@ -377,8 +489,8 @@ describe('ManifestTextParser', function() {
       expect(actualPlaylist.segments).toEqual(expectedPlaylist.segments);
     }
 
-    if (expectedPlaylist.uri) {
-      expect(actualPlaylist.uri).toEqual(expectedPlaylist.uri);
+    if (expectedPlaylist.absoluteUri) {
+      expect(actualPlaylist.absoluteUri).toEqual(expectedPlaylist.absoluteUri);
     }
   }
 });

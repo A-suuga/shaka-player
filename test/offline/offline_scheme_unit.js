@@ -15,8 +15,14 @@
  * limitations under the License.
  */
 
-describe('OfflineScheme', function() {
-  beforeEach(checkAndRun(async function() {
+describe('OfflineScheme', () => {
+  // An arbitrary request type.
+  const requestType = shaka.net.NetworkingEngine.RequestType.MANIFEST;
+
+  // A dummy progress callback.
+  const progressUpdated = (elapsedMs, bytes, bytesRemaining) => {};
+
+  beforeEach(checkAndRun(async () => {
     // Make sure we start with a clean slate.
     await clearStorage();
   }));
@@ -34,8 +40,9 @@ describe('OfflineScheme', function() {
         const uri = shaka.offline.OfflineUri.manifest(
             'mechanism', 'cell', 1024);
 
-        let response = await shaka.offline.OfflineScheme(
-            uri.toString(), request).promise;
+        // eslint-disable-next-line new-cap
+        const response = await shaka.offline.OfflineScheme(
+            uri.toString(), request, requestType, progressUpdated).promise;
 
         expect(response).toBeTruthy();
         expect(response.uri).toBe(uri.toString());
@@ -50,17 +57,21 @@ describe('OfflineScheme', function() {
     let uri;
 
     /** @type {!shaka.offline.StorageMuxer} */
-    let muxer = new shaka.offline.StorageMuxer();
-    await shaka.util.IDestroyable.with([muxer], async () => {
+    const muxer = new shaka.offline.StorageMuxer();
+
+    try {
       await muxer.init();
       let handle = await muxer.getActive();
       let keys = await handle.cell.addSegments([segment]);
       uri = shaka.offline.OfflineUri.segment(
           handle.path.mechanism, handle.path.cell, keys[0]);
-    });
+    } finally {
+      await muxer.destroy();
+    }
 
-    let response = await shaka.offline.OfflineScheme(
-        uri.toString(), request).promise;
+    // eslint-disable-next-line new-cap
+    const response = await shaka.offline.OfflineScheme(
+        uri.toString(), request, requestType, progressUpdated).promise;
 
     expect(response).toBeTruthy();
     expect(response.data.byteLength).toBe(segment.data.byteLength);
@@ -73,8 +84,9 @@ describe('OfflineScheme', function() {
     let uri;
 
     /** @type {!shaka.offline.StorageMuxer} */
-    let muxer = new shaka.offline.StorageMuxer();
-    await shaka.util.IDestroyable.with([muxer], async () => {
+    const muxer = new shaka.offline.StorageMuxer();
+
+    try {
       await muxer.init();
       let handle = await muxer.getActive();
 
@@ -83,10 +95,15 @@ describe('OfflineScheme', function() {
       const badKey = 1000000;
       uri = shaka.offline.OfflineUri.segment(
           handle.path.mechanism, handle.path.cell, badKey);
-    });
+    } finally {
+      await muxer.destroy();
+    }
 
     try {
-      await shaka.offline.OfflineScheme(uri.toString(), request).promise;
+      // eslint-disable-next-line new-cap
+      const op = shaka.offline.OfflineScheme(
+          uri.toString(), request, requestType, progressUpdated);
+      await op.promise;
       fail();
     } catch (e) {
       expect(e.code).toBe(shaka.util.Error.Code.KEY_NOT_FOUND);
@@ -98,7 +115,10 @@ describe('OfflineScheme', function() {
     const uri = 'this-in-an-invalid-uri';
 
     try {
-      await shaka.offline.OfflineScheme(uri, request).promise;
+      // eslint-disable-next-line new-cap
+      const op = shaka.offline.OfflineScheme(
+          uri, request, requestType, progressUpdated);
+      await op.promise;
       fail();
     } catch (e) {
       expect(e.code).toBe(shaka.util.Error.Code.MALFORMED_OFFLINE_URI);
@@ -106,7 +126,7 @@ describe('OfflineScheme', function() {
   }));
 
   /**
-   * @return {shakaExtern.Request}
+   * @return {shaka.extern.Request}
    */
   function createRequest() {
     let retry = shaka.net.NetworkingEngine.defaultRetryParameters();
@@ -116,13 +136,13 @@ describe('OfflineScheme', function() {
   }
 
   /**
-   * @return {shakaExtern.SegmentDataDB}
+   * @return {shaka.extern.SegmentDataDB}
    */
   function createSegment() {
     const dataLength = 12;
 
     let segment = {
-      data: new ArrayBuffer(dataLength)
+      data: new ArrayBuffer(dataLength),
     };
 
     return segment;
@@ -131,13 +151,15 @@ describe('OfflineScheme', function() {
   /**
    * @return {!Promise}
    */
-  function clearStorage() {
+  async function clearStorage() {
     /** @type {!shaka.offline.StorageMuxer} */
-    let muxer = new shaka.offline.StorageMuxer();
-    return shaka.util.IDestroyable.with([muxer], async () => {
-      await muxer.init();
+    const muxer = new shaka.offline.StorageMuxer();
+
+    try {
       await muxer.erase();
-    });
+    } finally {
+      await muxer.destroy;
+    }
   }
 
   /**

@@ -33,10 +33,7 @@ describe('TextTrackIntegration', function() {
   let trackCues;
 
   beforeEach(function() {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
     expect(video.textTracks).toBeTruthy();
@@ -94,7 +91,7 @@ describe('TextTrackIntegration', function() {
   describe('addCue', function() {
     let cues = [
       new VTTCue(0, 1000, 'Cue 1 message'),
-      new VTTCue(2000, 3000, 'Cue 2 message')
+      new VTTCue(2000, 3000, 'Cue 2 message'),
     ];
 
     it('adds cues when showing', function() {
@@ -134,7 +131,7 @@ describe('TextTrackIntegration', function() {
   describe('removeCue', function() {
     let cues = [
       new VTTCue(0, 1000, 'Cue 1 message'),
-      new VTTCue(2000, 3000, 'Cue 2 message')
+      new VTTCue(2000, 3000, 'Cue 2 message'),
     ];
 
     it('removes cues when showing', function() {

@@ -16,6 +16,8 @@
  */
 
 
+goog.require('goog.asserts');
+
 
 /**
  * A Chromecast receiver demo app.
@@ -33,13 +35,7 @@ function ShakaReceiver() {
   this.receiver_ = null;
 
   /** @private {Element} */
-  this.pauseIcon_ = null;
-
-  /** @private {Element} */
   this.controlsElement_ = null;
-
-  /** @private {ShakaControls} */
-  this.controlsUi_ = null;
 
   /** @private {?number} */
   this.controlsTimerId_ = null;
@@ -63,17 +59,40 @@ function ShakaReceiver() {
  * Initialize the application.
  */
 ShakaReceiver.prototype.init = function() {
+  // TODO: Check if this is needed after fixing IE
   shaka.polyfill.installAll();
 
-  this.video_ =
-      /** @type {!HTMLMediaElement} */(document.getElementById('video'));
-  this.player_ = new shaka.Player(this.video_);
+  /** @type {HTMLMediaElement} */
+  let video = /** @type {HTMLMediaElement} */
+      (document.getElementById('video'));
+  goog.asserts.assert(video, 'Video element should be available!');
+  this.video_ = video;
 
-  this.controlsUi_ = new ShakaControls();
-  this.controlsUi_.initMinimal(this.video_, this.player_);
+  /** @type {!shaka.ui.Overlay} */
+  let ui = this.video_['ui'];
+  goog.asserts.assert(ui, 'UI should be available!');
 
-  this.controlsElement_ = document.getElementById('controls');
-  this.pauseIcon_ = document.getElementById('pauseIcon');
+  // Make sure we don't show extra UI elements we don't need on the TV.
+  ui.configure({
+    controlPanelElements: [
+      'play_pause',
+      'time_and_duration',
+      'spacer',
+    ],
+  });
+
+  // We use the UI library on both sender and receiver, to get a consistent UI
+  // in both contexts.  The controls, therefore, have both a proxy player
+  // (getPlayer) and a local player (getLocalPlayer).  The proxy player is
+  // what the sender uses to send commands to the receiver when it's casting.
+  // Since this _is_ the receiver, we use the local player (local to this
+  // environment on the receiver).  This local player (local to the receiver)
+  // will be remotely controlled by the proxy on the sender side.
+  this.player_ = ui.getControls().getLocalPlayer();
+  goog.asserts.assert(this.player_, 'Player should be available!');
+
+  this.controlsElement_ = document.querySelector('.shaka-controls-container');
+
   this.idle_ = document.getElementById('idle');
 
   this.video_.addEventListener(
@@ -86,7 +105,8 @@ ShakaReceiver.prototype.init = function() {
       'emptied', this.onPlayStateChange_.bind(this));
 
   this.receiver_ = new shaka.cast.CastReceiver(
-      this.video_, this.player_, this.appDataCallback_.bind(this));
+      this.video_, /** @type {!shaka.Player} */ (this.player_),
+      this.appDataCallback_.bind(this));
   this.receiver_.addEventListener(
       'caststatuschanged', this.checkIdle_.bind(this));
 
@@ -102,8 +122,10 @@ ShakaReceiver.prototype.appDataCallback_ = function(appData) {
   // appData is null if we start the app without any media loaded.
   if (!appData) return;
 
-  let asset = /** @type {shakaAssets.AssetInfo} */(appData['asset']);
-  ShakaDemoUtils.setupAssetMetadata(asset, this.player_);
+  const asset = ShakaDemoAssetInfo.fromJSON(appData['asset']);
+  asset.applyFilters(this.player_.getNetworkingEngine());
+  const config = asset.getConfiguration();
+  this.player_.configure(config);
 };
 
 
@@ -122,7 +144,7 @@ ShakaReceiver.prototype.checkIdle_ = function() {
     this.cancelIdleTimer_();
 
     // Set a special poster for audio-only assets.
-    if (this.player_.isAudioOnly()) {
+    if (this.video_.readyState != 0 && this.player_.isAudioOnly()) {
       this.video_.poster =
           'https://shaka-player-demo.appspot.com/assets/audioOnly.gif';
     } else {
@@ -157,12 +179,6 @@ ShakaReceiver.prototype.onPlayStateChange_ = function() {
     window.clearTimeout(this.controlsTimerId_);
   }
 
-  if (this.video_.paused) {
-    this.pauseIcon_.textContent = 'pause';
-  } else {
-    this.pauseIcon_.textContent = 'play_arrow';
-  }
-
   if (this.video_.paused && this.video_.readyState > 0) {
     // Show controls.
     this.controlsElement_.style.opacity = 1;
@@ -185,9 +201,4 @@ function receiverAppInit() {
 }
 
 
-if (document.readyState == 'loading' ||
-    document.readyState == 'interactive') {
-  window.addEventListener('load', receiverAppInit);
-} else {
-  receiverAppInit();
-}
+document.addEventListener('shaka-ui-loaded', receiverAppInit);

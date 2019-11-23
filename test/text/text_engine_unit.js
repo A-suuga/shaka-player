@@ -42,11 +42,13 @@ describe('TextEngine', function() {
     mockParserPlugIn = function() {
       return {
         parseInit: mockParseInit,
-        parseMedia: mockParseMedia
+        parseMedia: mockParseMedia,
       };
     };
 
     mockDisplayer = new shaka.test.FakeTextDisplayer();
+    mockDisplayer.removeSpy.and.returnValue(true);
+
     TextEngine.registerParser(dummyMimeType, mockParserPlugIn);
     textEngine = new TextEngine(mockDisplayer);
     textEngine.initParser(dummyMimeType);
@@ -65,41 +67,60 @@ describe('TextEngine', function() {
       TextEngine.unregisterParser(dummyMimeType);
       expect(TextEngine.isTypeSupported(dummyMimeType)).toBe(false);
     });
+
+    it('reports support when it\'s closed captions and muxjs is available',
+          function() {
+        const closedCaptionsType =
+           shaka.util.MimeUtils.CLOSED_CAPTION_MIMETYPE;
+        const originalMuxjs = window.muxjs;
+        expect(TextEngine.isTypeSupported(closedCaptionsType)).toBe(true);
+        try {
+          window['muxjs'] = null;
+          expect(TextEngine.isTypeSupported(closedCaptionsType)).toBe(false);
+        } finally {
+          window['muxjs'] = originalMuxjs;
+        }
+    });
   });
 
   describe('appendBuffer', function() {
     it('works asynchronously', function(done) {
       mockParseMedia.and.returnValue([1, 2, 3]);
       textEngine.appendBuffer(dummyData, 0, 3).catch(fail).then(done);
-      expect(mockDisplayer.append).not.toHaveBeenCalled();
+      expect(mockDisplayer.appendSpy).not.toHaveBeenCalled();
     });
 
-    it('calls displayer.append()', function(done) {
+    it('calls displayer.append()', async () => {
       let cue1 = createFakeCue(1, 2);
       let cue2 = createFakeCue(2, 3);
       let cue3 = createFakeCue(3, 4);
       let cue4 = createFakeCue(4, 5);
       mockParseMedia.and.returnValue([cue1, cue2]);
 
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(mockParseMedia).toHaveBeenCalledWith(
-            new Uint8Array(dummyData),
-            {periodStart: 0, segmentStart: 0, segmentEnd: 3});
-        expect(mockDisplayer.append).toHaveBeenCalledWith([cue1, cue2]);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+      expect(mockParseMedia).toHaveBeenCalledOnceMoreWith([
+          new Uint8Array(dummyData),
+          {periodStart: 0, segmentStart: 0, segmentEnd: 3},
+      ]);
 
-        expect(mockDisplayer.remove).not.toHaveBeenCalled();
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
+        [cue1, cue2],
+      ]);
 
-        mockDisplayer.append.calls.reset();
-        mockParseMedia.calls.reset();
+      expect(mockDisplayer.removeSpy).not.toHaveBeenCalled();
 
-        mockParseMedia.and.returnValue([cue3, cue4]);
-        return textEngine.appendBuffer(dummyData, 3, 5);
-      }).then(function() {
-        expect(mockParseMedia).toHaveBeenCalledWith(
-            new Uint8Array(dummyData),
-            {periodStart: 0, segmentStart: 3, segmentEnd: 5});
-        expect(mockDisplayer.append).toHaveBeenCalledWith([cue3, cue4]);
-      }).catch(fail).then(done);
+      mockParseMedia.and.returnValue([cue3, cue4]);
+
+      await textEngine.appendBuffer(dummyData, 3, 5);
+
+      expect(mockParseMedia).toHaveBeenCalledOnceMoreWith([
+        new Uint8Array(dummyData),
+        {periodStart: 0, segmentStart: 3, segmentEnd: 5},
+      ]);
+
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
+        [cue3, cue4],
+      ]);
     });
 
     it('does not throw if called right before destroy', function(done) {
@@ -108,6 +129,111 @@ describe('TextEngine', function() {
       textEngine.destroy();
     });
   });
+
+  describe('storeAndAppendClosedCaptions', function() {
+    it('appends closed captions with selected id', function() {
+      const caption = {
+        startPts: 0,
+        endPts: 100,
+        startTime: 0,
+        endTime: 1,
+        stream: 'CC1',
+        text: 'captions',
+      };
+
+      textEngine.setSelectedClosedCaptionId('CC1', 0);
+      textEngine.storeAndAppendClosedCaptions(
+          [caption], /* startTime */ 0, /* endTime */ 2, /* offset */ 0);
+      expect(mockDisplayer.appendSpy).toHaveBeenCalled();
+    });
+
+    it('does not append closed captions without selected id', function() {
+      const caption = {
+        startPts: 0,
+        endPts: 100,
+        startTime: 1,
+        endTime: 2,
+        stream: 'CC1',
+        text: 'caption2',
+      };
+
+      textEngine.setSelectedClosedCaptionId('CC3', 0);
+      textEngine.storeAndAppendClosedCaptions(
+          [caption], /* startTime */ 0, /* endTime */ 2, /* offset */ 0);
+      expect(mockDisplayer.appendSpy).not.toHaveBeenCalled();
+    });
+
+    it('stores closed captions', function() {
+      const caption0 = {
+        startPts: 0,
+        endPts: 100,
+        startTime: 0,
+        endTime: 1,
+        stream: 'CC1',
+        text: 'caption1',
+      };
+      const caption1 = {
+        startPts: 0,
+        endPts: 100,
+        startTime: 1,
+        endTime: 2,
+        stream: 'CC1',
+        text: 'caption2',
+      };
+      const caption2 = {
+        startPts: 0,
+        endPts: 100,
+        startTime: 1,
+        endTime: 2,
+        stream: 'CC3',
+        text: 'caption3',
+      };
+
+      textEngine.setSelectedClosedCaptionId('CC1', 0);
+      // Text Engine stores all the closed captions as a two layer map.
+      // {closed caption id -> {start and end time -> cues}}
+      textEngine.storeAndAppendClosedCaptions(
+          [caption0], /* startTime */ 0, /* endTime */ 1, /* offset */ 0);
+      expect(textEngine.getNumberOfClosedCaptionChannels()).toEqual(1);
+      expect(textEngine.getNumberOfClosedCaptionsInChannel('CC1')).toEqual(1);
+
+      textEngine.storeAndAppendClosedCaptions(
+          [caption1], /* startTime */ 1, /* endTime */ 2, /* offset */ 0);
+      // Caption1 has the same stream id with caption0, but different start and
+      // end time. The closed captions map should have 1 key CC1, and two values
+      // for two start and end times.
+      expect(textEngine.getNumberOfClosedCaptionChannels()).toEqual(1);
+      expect(textEngine.getNumberOfClosedCaptionsInChannel('CC1')).toEqual(2);
+
+      textEngine.storeAndAppendClosedCaptions(
+          [caption2], /* startTime */ 1, /* endTime */ 2, /* offset */ 0);
+      // Caption2 has a different stream id CC3, so the closed captions map
+      // should have two different keys, CC1 and CC3.
+      expect(textEngine.getNumberOfClosedCaptionChannels()).toEqual(2);
+    });
+
+    it('offsets closed captions to account for video offset', function() {
+      const caption = {
+        startPts: 0,
+        endPts: 100,
+        startTime: 0,
+        endTime: 1,
+        stream: 'CC1',
+        text: 'captions',
+      };
+
+      textEngine.setSelectedClosedCaptionId('CC1', 0);
+      textEngine.storeAndAppendClosedCaptions(
+          [caption], /* startTime */ 0, /* endTime */ 2, /* offset */ 1000);
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledWith([
+        jasmine.objectContaining({
+          startTime: 1000,
+          endTime: 1001,
+        }),
+      ]);
+    });
+  });
+
 
   describe('remove', function() {
     let cue1;
@@ -124,15 +250,14 @@ describe('TextEngine', function() {
     it('works asynchronously', function(done) {
       textEngine.appendBuffer(dummyData, 0, 3).then(function() {
         let p = textEngine.remove(0, 1);
-        expect(mockDisplayer.remove).not.toHaveBeenCalled();
+        expect(mockDisplayer.removeSpy).not.toHaveBeenCalled();
         return p;
       }).catch(fail).then(done);
     });
 
-
     it('calls displayer.remove()', function(done) {
       textEngine.remove(0, 1).then(function() {
-        expect(mockDisplayer.remove).toHaveBeenCalledWith(0, 1);
+        expect(mockDisplayer.removeSpy).toHaveBeenCalledWith(0, 1);
       }).catch(fail).then(done);
     });
 
@@ -143,40 +268,42 @@ describe('TextEngine', function() {
   });
 
   describe('setTimestampOffset', function() {
-    it('passes the offset to the parser', function(done) {
-      mockParseMedia.and.callFake(function(data, time) {
+    it('passes the offset to the parser', async () => {
+      mockParseMedia.and.callFake((data, time) => {
         return [
           createFakeCue(time.periodStart + 0,
                         time.periodStart + 1),
           createFakeCue(time.periodStart + 2,
-                        time.periodStart + 3)
+                        time.periodStart + 3),
         ];
       });
 
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(mockParseMedia).toHaveBeenCalledWith(
-            new Uint8Array(dummyData),
-            {periodStart: 0, segmentStart: 0, segmentEnd: 3});
+      await textEngine.appendBuffer(dummyData, 0, 3);
 
-        expect(mockDisplayer.append).toHaveBeenCalledWith(
-            [
-              createFakeCue(0, 1),
-              createFakeCue(2, 3)
-            ]);
+      expect(mockParseMedia).toHaveBeenCalledOnceMoreWith([
+        new Uint8Array(dummyData),
+        {periodStart: 0, segmentStart: 0, segmentEnd: 3},
+      ]);
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
+        [
+          createFakeCue(0, 1),
+          createFakeCue(2, 3),
+        ],
+      ]);
 
-        mockDisplayer.append.calls.reset();
-        textEngine.setTimestampOffset(4);
-        return textEngine.appendBuffer(dummyData, 4, 7);
-      }).then(function() {
-        expect(mockParseMedia).toHaveBeenCalledWith(
-            new Uint8Array(dummyData),
-            {periodStart: 4, segmentStart: 4, segmentEnd: 7});
-        expect(mockDisplayer.append).toHaveBeenCalledWith(
-            [
-              createFakeCue(4, 5),
-              createFakeCue(6, 7)
-            ]);
-      }).catch(fail).then(done);
+      textEngine.setTimestampOffset(4);
+      await textEngine.appendBuffer(dummyData, 4, 7);
+
+      expect(mockParseMedia).toHaveBeenCalledOnceMoreWith([
+        new Uint8Array(dummyData),
+        {periodStart: 4, segmentStart: 4, segmentEnd: 7},
+      ]);
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
+        [
+          createFakeCue(4, 5),
+          createFakeCue(6, 7),
+        ],
+      ]);
     });
   });
 
@@ -304,25 +431,26 @@ describe('TextEngine', function() {
       });
     });
 
-    it('limits appended cues', function(done) {
+    it('limits appended cues', async () => {
       textEngine.setAppendWindow(0, 1.9);
-      textEngine.appendBuffer(dummyData, 0, 3).then(function() {
-        expect(mockDisplayer.append).toHaveBeenCalledWith(
-            [
-              createFakeCue(0, 1),
-              createFakeCue(1, 2)
-            ]);
+      await textEngine.appendBuffer(dummyData, 0, 3);
 
-        mockDisplayer.append.calls.reset();
-        textEngine.setAppendWindow(1, 2.1);
-        return textEngine.appendBuffer(dummyData, 0, 3);
-      }).then(function() {
-        expect(mockDisplayer.append).toHaveBeenCalledWith(
-            [
-              createFakeCue(1, 2),
-              createFakeCue(2, 3)
-            ]);
-      }).catch(fail).then(done);
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
+        [
+          createFakeCue(0, 1),
+          createFakeCue(1, 2),
+        ],
+      ]);
+
+      textEngine.setAppendWindow(1, 2.1);
+      await textEngine.appendBuffer(dummyData, 0, 3);
+
+      expect(mockDisplayer.appendSpy).toHaveBeenCalledOnceMoreWith([
+        [
+          createFakeCue(1, 2),
+          createFakeCue(2, 3),
+        ],
+      ]);
     });
 
     it('limits bufferStart', function(done) {

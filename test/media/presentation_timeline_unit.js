@@ -46,6 +46,7 @@ describe('PresentationTimeline', function() {
    * @param {number} maxSegmentDuration
    * @param {number} clockOffset
    * @param {number} presentationDelay
+   * @param {boolean=} autoCorrectDrift
    *
    * @return {shaka.media.PresentationTimeline}
    */
@@ -56,9 +57,10 @@ describe('PresentationTimeline', function() {
       segmentAvailabilityDuration,
       maxSegmentDuration,
       clockOffset,
-      presentationDelay) {
+      presentationDelay,
+      autoCorrectDrift = true) {
     let timeline = new shaka.media.PresentationTimeline(
-        presentationStartTime, presentationDelay);
+        presentationStartTime, presentationDelay, autoCorrectDrift);
     timeline.setStatic(isStatic);
     timeline.setDuration(duration || Infinity);
     timeline.setSegmentAvailabilityDuration(segmentAvailabilityDuration);
@@ -88,15 +90,15 @@ describe('PresentationTimeline', function() {
    * Creates a IPR PresentationTimeline.
    *
    * @param {number} duration
-   * @param {number=} opt_delay
+   * @param {number=} delay
    * @return {shaka.media.PresentationTimeline}
    */
-  function makeIprTimeline(duration, opt_delay) {
+  function makeIprTimeline(duration, delay) {
     let now = Date.now() / 1000;
     let timeline = makePresentationTimeline(
         /* static */ false, duration, /* start time */ now,
         /* availability */ Infinity, /* max seg dur */ 10,
-        /* clock offset */ 0, opt_delay || 0);
+        /* clock offset */ 0, delay || 0);
     expect(timeline.isLive()).toBe(false);
     expect(timeline.isInProgress()).toBe(true);
     return timeline;
@@ -106,18 +108,37 @@ describe('PresentationTimeline', function() {
    * Creates a live PresentationTimeline.
    *
    * @param {number} availability
-   * @param {number=} opt_delay
+   * @param {number=} delay
+   * @param {boolean=} autoCorrectDrift
    * @return {shaka.media.PresentationTimeline}
    */
-  function makeLiveTimeline(availability, opt_delay) {
+  function makeLiveTimeline(availability, delay, autoCorrectDrift = true) {
     let now = Date.now() / 1000;
     let timeline = makePresentationTimeline(
         /* static */ false, /* duration */ Infinity, /* start time */ now,
         availability, /* max seg dur */ 10,
-        /* clock offset */ 0, opt_delay || 0);
+        /* clock offset */ 0, delay || 0, autoCorrectDrift);
     expect(timeline.isLive()).toBe(true);
     expect(timeline.isInProgress()).toBe(false);
     return timeline;
+  }
+
+  /**
+   * Creates a simple, dummy segment reference.
+   * @param {number} startTime
+   * @param {number} endTime
+   * @return {shaka.media.SegmentReference}
+   */
+  function makeSegmentReference(startTime, endTime) {
+      // start and end times are the only fields that matter to
+      // PresentationTimeline.
+      return new shaka.media.SegmentReference(
+          /* position */ 0,
+          startTime,
+          endTime,
+          /* uris */ function() { return []; },
+          /* startByte */ 0,
+          /* endByte */ null);
   }
 
   describe('getSegmentAvailabilityStart', function() {
@@ -173,6 +194,44 @@ describe('PresentationTimeline', function() {
 
       setElapsed(61);
       expect(timeline.getSegmentAvailabilityStart()).toBe(0);
+    });
+
+    it('calculates time based on segment times when available', () => {
+      let timeline = makeLiveTimeline(/* availability */ 20);
+
+      const ref1 = makeSegmentReference(0, 10);
+      const ref2 = makeSegmentReference(10, 20);
+      const ref3 = makeSegmentReference(20, 30);
+      const ref4 = makeSegmentReference(30, 40);
+      const ref5 = makeSegmentReference(40, 50);
+
+      // In spite of the current time, the explicit segment times will decide
+      // the availability window.
+      // See https://github.com/google/shaka-player/issues/999
+      setElapsed(1000);
+      timeline.notifySegments([ref1, ref2, ref3, ref4, ref5],
+                              /* periodStart */ 0);
+
+      // last segment time (50) - availability (20)
+      expect(timeline.getSegmentAvailabilityStart()).toBe(30);
+    });
+
+    it('ignores segment times when configured to', () => {
+      const timeline = makeLiveTimeline(
+          /* availability */ 20, /* drift */ 0, /* autoCorrectDrift */ false);
+
+      const ref1 = makeSegmentReference(0, 10);
+      const ref2 = makeSegmentReference(10, 20);
+      const ref3 = makeSegmentReference(20, 30);
+      const ref4 = makeSegmentReference(30, 40);
+      const ref5 = makeSegmentReference(40, 50);
+
+      setElapsed(100);
+      timeline.notifySegments([ref1, ref2, ref3, ref4, ref5],
+                              /* periodStart */ 0);
+
+      // now (100) - max segment duration (10) - availability start time (0)
+      expect(timeline.getSegmentAvailabilityEnd()).toBe(90);
     });
   });
 
@@ -237,6 +296,26 @@ describe('PresentationTimeline', function() {
       expect(timeline1.getSegmentAvailabilityEnd()).toBe(61);
       expect(timeline2.getSegmentAvailabilityEnd()).toBe(61);
     });
+
+    it('calculates time based on segment times when available', () => {
+      let timeline = makeLiveTimeline(/* availability */ 20);
+
+      const ref1 = makeSegmentReference(0, 10);
+      const ref2 = makeSegmentReference(10, 20);
+      const ref3 = makeSegmentReference(20, 30);
+      const ref4 = makeSegmentReference(30, 40);
+      const ref5 = makeSegmentReference(40, 50);
+
+      // In spite of the current time, the explicit segment times will decide
+      // the availability window.
+      // See https://github.com/google/shaka-player/issues/999
+      setElapsed(1000);
+      timeline.notifySegments([ref1, ref2, ref3, ref4, ref5],
+                              /* periodStart */ 0);
+
+      // last segment time (50)
+      expect(timeline.getSegmentAvailabilityEnd()).toBe(50);
+    });
   });
 
   describe('getDuration', function() {
@@ -285,40 +364,6 @@ describe('PresentationTimeline', function() {
     });
   });
 
-  describe('getSeekRangeStart', function() {
-    it('accounts for available segments', function() {
-      let timeline = makeLiveTimeline(/* availability */ 60, /* delay */ 0);
-
-      setElapsed(120);
-      // now (120) - availability (60) - segment size (10) = 50
-      expect(timeline.getSeekRangeStart()).toBe(50);
-
-      let ref = new shaka.media.SegmentReference(
-          /* position */ 0,
-          /* startTime */ 30,
-          /* endTime */ 40,
-          /* uris */ function() { return []; },
-          /* startByte */ 0,
-          /* endByte */ null);
-      timeline.notifySegments([ref], true);
-      // The earliest segment time is earlier than now - availability duration,
-      // so the seek range is not based on the segment list.
-      expect(timeline.getSeekRangeStart()).toBe(50);
-
-      ref = new shaka.media.SegmentReference(
-          /* position */ 0,
-          /* startTime */ 90,
-          /* endTime */ 100,
-          /* uris */ function() { return []; },
-          /* startByte */ 0,
-          /* endByte */ null);
-      timeline.notifySegments([ref], true);
-      // The earliest segment time is later than now - availability duration,
-      // so segment time 90 takes precedence.
-      expect(timeline.getSeekRangeStart()).toBe(90);
-    });
-  });
-
   describe('getSafeSeekRangeStart', function() {
     it('ignores offset for VOD', function() {
       let timeline = makeVodTimeline(/* duration */ 60);
@@ -356,6 +401,22 @@ describe('PresentationTimeline', function() {
       expect(timeline.getSeekRangeStart()).toBe(0);
       expect(timeline.getSafeSeekRangeStart(0)).toBe(0);
       expect(timeline.getSafeSeekRangeStart(25)).toBe(5);
+    });
+
+    it('adjusts segment times to the presentation timeline', () => {
+      // All of these segments fit in the availability window.
+      let timeline = makeLiveTimeline(/* availability */ 100);
+
+      // A reference from 30-40, + period start 0
+      timeline.notifySegments([makeSegmentReference(30, 40)],
+                              /* periodStart */ 0);
+
+      // A reference from 0-10, + period start 40
+      timeline.notifySegments([makeSegmentReference(0, 10)],
+                              /* periodStart */ 40);
+
+      // If we hadn't adjusted for period start, this would be 0.
+      expect(timeline.getSeekRangeStart()).toBe(30);
     });
   });
 

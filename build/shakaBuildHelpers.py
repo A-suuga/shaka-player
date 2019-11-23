@@ -20,6 +20,8 @@ This uses two environment variables to help with debugging the scripts:
   RAISE_INTERRUPT - Will raise keyboard interrupts rather than swallowing them.
 """
 
+from __future__ import print_function
+
 import errno
 import json
 import logging
@@ -56,7 +58,18 @@ def _modules_need_update():
 
 def _parse_version(version):
   """Converts the given string version to a tuple of numbers."""
-  return tuple([int(i) for i in version.split('.')])
+  # Handle any prerelease or build metadata, such as -beta or -g1234
+  if '-' in version:
+    version, trailer = version.split('-')
+  else:
+    # Versions without a trailer should sort later than those with a trailer.
+    # For example, 2.5.0-beta comes before 2.5.0.
+    # To accomplish this, we synthesize a trailer which sorts later than any
+    # _reasonable_ alphanumeric version trailer would.  These characters have a
+    # high value in ASCII.
+    trailer = '}}}'
+  numeric_parts = [int(i) for i in version.split('.')]
+  return tuple(numeric_parts + [trailer])
 
 
 def get_source_base():
@@ -104,6 +117,18 @@ def quote_argument(arg):
   if ' ' in arg:
     return '"' + arg + '"'
   return arg
+
+
+def open_file(*args, **kwargs):
+  """Opens a file with the given mode and options."""
+  if sys.version_info[0] == 2:
+    # Python 2 returns byte strings even in text mode, so the encoding doesn't
+    # matter.
+    return open(*args, **kwargs)
+  else:
+    # Python 3 requires setting an encoding so it reads strings.  The default
+    # is based on the platform, which on Windows, isn't UTF-8.
+    return open(encoding='utf8', *args, **kwargs)
 
 
 def execute_subprocess(args, **kwargs):
@@ -219,24 +244,35 @@ def get_all_files(dir_path, exp=None):
   return ret
 
 
-def get_node_binary(name):
+def get_node_binary(module_name, bin_name=None):
   """Returns an array to be used in the command-line execution of a node binary.
 
   For example, this may return ['eslint'] (global install)
   or ['node', 'path/to/node_modules/eslint/bin/eslint.js'] (local install).
+
+  Arguments:
+    module_name: A string, the name of the module.
+    bin_name: An optional string, the name of the binary, which defaults to
+              module_name if not provided.
+
+  Returns:
+    An array of strings which form the command-line to call the binary.
   """
+
+  if not bin_name:
+    bin_name = module_name
 
   # Check local modules first.
   base = get_source_base()
-  path = os.path.join(base, 'node_modules', name)
+  path = os.path.join(base, 'node_modules', module_name)
   if os.path.isdir(path):
     json_path = os.path.join(path, 'package.json')
-    package_data = json.load(open(json_path, 'r'))
-    bin_path = os.path.join(path, package_data['bin'][name])
+    package_data = json.load(open_file(json_path, 'r'))
+    bin_path = os.path.join(path, package_data['bin'][bin_name])
     return ['node', bin_path]
 
   # Not found locally, assume it can be found in os.environ['PATH'].
-  return [name]
+  return [bin_name]
 
 
 class InDir(object):
@@ -264,7 +300,7 @@ def update_node_modules():
   # Check the version of npm.
   version = execute_get_output([cmd, '-v']).decode('utf8')
 
-  if _parse_version(version) < _parse_version('1.3.12'):
+  if _parse_version(version) < _parse_version('5.0.0'):
     logging.error('npm version is too old, please upgrade.  e.g.:')
     logging.error('  npm install -g npm')
     return False
@@ -273,15 +309,12 @@ def update_node_modules():
   # Actually change directories instead of using npm --prefix.
   # See npm/npm#17027 and google/shaka-player#776 for more details.
   with InDir(base):
-    if _parse_version(version) >= _parse_version('5.0.0'):
-      # npm update seems to be the wrong thing in npm v5, so use install.
-      # See google/shaka-player#854 for more details.
-      execute_get_output([cmd, 'install'])
-    else:
-      execute_get_output([cmd, 'update'])
+    # npm update seems to be the wrong thing in npm v5, so use install.
+    # See google/shaka-player#854 for more details.
+    execute_get_output([cmd, 'install'])
 
   # Update the timestamp of the file that tracks when we last updated.
-  open(_node_modules_last_update_path(), 'w').close()
+  open(_node_modules_last_update_path(), 'wb').close()
   return True
 
 
@@ -302,6 +335,6 @@ def run_main(main):
   except KeyboardInterrupt:
     if os.environ.get('RAISE_INTERRUPT'):
       raise
-    print >> sys.stderr  # Clear the current line that has ^C on it.
+    print(file=sys.stderr)  # Clear the current line that has ^C on it.
     logging.error('Keyboard interrupt')
     sys.exit(1)

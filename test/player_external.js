@@ -15,14 +15,16 @@
  * limitations under the License.
  */
 
-describe('Player', function() {
+describe('Player', () => {
   const Util = shaka.test.Util;
   const Feature = shakaAssets.Feature;
+  const waitForMovementOrFailOnTimeout = Util.waitForMovementOrFailOnTimeout;
+  const waitForEndOrTimeout = Util.waitForEndOrTimeout;
 
   /** @type {!jasmine.Spy} */
   let onErrorSpy;
 
-  /** @type {shakaExtern.SupportType} */
+  /** @type {shaka.extern.SupportType} */
   let support;
   /** @type {!HTMLVideoElement} */
   let video;
@@ -34,10 +36,7 @@ describe('Player', function() {
   let compiledShaka;
 
   beforeAll(async () => {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
 
     /** @type {!shaka.util.PublicPromise} */
@@ -49,7 +48,7 @@ describe('Player', function() {
     } else {
       // Load the compiled library as a module.
       // All tests in this suite will use the compiled library.
-      require(['/base/dist/shaka-player.compiled.js'], (shakaModule) => {
+      require(['/base/dist/shaka-player.ui.js'], (shakaModule) => {
         compiledShaka = shakaModule;
         loaded.resolve();
       });
@@ -59,34 +58,29 @@ describe('Player', function() {
     support = await compiledShaka.Player.probeSupport();
   });
 
-  beforeEach(function() {
+  beforeEach(() => {
     player = new compiledShaka.Player(video);
 
     // Grab event manager from the uncompiled library:
     eventManager = new shaka.util.EventManager();
 
     onErrorSpy = jasmine.createSpy('onError');
-    onErrorSpy.and.callFake(function(event) { fail(event.detail); });
+    onErrorSpy.and.callFake((event) => fail(event.detail));
     eventManager.listen(player, 'error', Util.spyFunc(onErrorSpy));
   });
 
   afterEach(async () => {
-    await Promise.all([
-      eventManager.destroy(),
-      player.destroy(),
-    ]);
+    eventManager.release();
 
-    // Work-around: allow the Tizen media pipeline to cool down.
-    // Without this, Tizen's pipeline seems to hang in subsequent tests.
-    // TODO: file a bug on Tizen
-    await Util.delay(0.1);
+    await player.destroy();
   });
 
-  afterAll(function() {
+  afterAll(() => {
     document.body.removeChild(video);
   });
 
-  describe('plays', function() {
+  describe('plays', () => {
+    /** @param {!ShakaDemoAssetInfo} asset */
     function createAssetTest(asset) {
       if (asset.disabled) return;
 
@@ -95,85 +89,121 @@ describe('Player', function() {
 
       let wit = asset.focus ? fit : it;
       wit(testName, async () => {
-        if (asset.drm.length && !asset.drm.some(
-            function(keySystem) { return support.drm[keySystem]; })) {
+        if (!asset.isClear() &&
+            !asset.drm.some((keySystem) => support.drm[keySystem])) {
           pending('None of the required key systems are supported.');
         }
 
         if (asset.features) {
           let mimeTypes = [];
-          if (asset.features.indexOf(Feature.WEBM) >= 0) {
+          if (asset.features.includes(Feature.WEBM)) {
             mimeTypes.push('video/webm');
           }
-          if (asset.features.indexOf(Feature.MP4) >= 0) {
+          if (asset.features.includes(Feature.MP4)) {
             mimeTypes.push('video/mp4');
           }
-          if (!mimeTypes.some(
-              function(type) { return support.media[type]; })) {
+          if (mimeTypes.length &&
+              !mimeTypes.some((type) => support.media[type])) {
             pending('None of the required MIME types are supported.');
           }
         }
 
-        let config = {abr: {}, drm: {}, manifest: {dash: {}}};
-        config.abr.enabled = false;
-        config.manifest.dash.clockSyncUri =
-            'https://shaka-player-demo.appspot.com/time.txt';
+        // Make sure we are playing the lowest res available to avoid test flake
+        // based on network issues.  Note that disabling ABR and setting a low
+        // abr.defaultBandwidthEstimate would not be sufficient, because it
+        // would only affect the choice of track on the first period.  When we
+        // cross a period boundary, the default bandwidth estimate will no
+        // longer be in effect, and AbrManager may choose higher res tracks for
+        // the new period.  Using abr.restrictions.maxHeight will let us force
+        // AbrManager to the lowest resolution, which is its fallback when these
+        // soft restrictions cannot be met.
+        player.configure('abr.restrictions.maxHeight', 1);
+
+        // Make sure that live streams are synced against a good clock.
+        player.configure('manifest.dash.clockSyncUri',
+            'https://shaka-player-demo.appspot.com/time.txt');
+
+        // Make sure we don't get stuck on gaps that only appear in some
+        // browsers (Safari, Firefox).
+        // TODO(https://github.com/google/shaka-player/issues/1702):
+        // Is this necessary because of a bug in Shaka Player?
+        player.configure('streaming.jumpLargeGaps', true);
+
+        // Configure DRM for this asset.
         if (asset.licenseServers) {
-          config.drm.servers = asset.licenseServers;
+          player.configure('drm.servers', asset.licenseServers);
         }
         if (asset.drmCallback) {
-          config.manifest.dash.customScheme = asset.drmCallback;
+          player.configure('manifest.dash.customScheme', asset.drmCallback);
         }
         if (asset.clearKeys) {
-          config.drm.clearKeys = asset.clearKeys;
+          player.configure('drm.clearKeys', asset.clearKeys);
         }
-        player.configure(config);
 
+        // Configure networking for this asset.
+        const networkingEngine = player.getNetworkingEngine();
         if (asset.licenseRequestHeaders) {
-          player.getNetworkingEngine().registerRequestFilter(
-              addLicenseRequestHeaders.bind(null, asset.licenseRequestHeaders));
+          const headers = asset.licenseRequestHeaders;
+          networkingEngine.registerRequestFilter((requestType, request) => {
+            addLicenseRequestHeaders(headers, requestType, request);
+          });
         }
-
-        let networkingEngine = player.getNetworkingEngine();
         if (asset.requestFilter) {
           networkingEngine.registerRequestFilter(asset.requestFilter);
         }
         if (asset.responseFilter) {
           networkingEngine.registerResponseFilter(asset.responseFilter);
         }
+
+        // Add any extra configuration for this asset.
         if (asset.extraConfig) {
           player.configure(asset.extraConfig);
         }
 
         await player.load(asset.manifestUri);
         if (asset.features) {
-          const isLive = asset.features.indexOf(Feature.LIVE) >= 0;
+          const isLive = asset.features.includes(Feature.LIVE);
           expect(player.isLive()).toEqual(isLive);
         }
         video.play();
 
-        // 30 seconds or video ended, whichever comes first.
-        await waitForTimeOrEnd(video, 40);
+        // Wait for the video to start playback.  If it takes longer than 20
+        // seconds, fail the test.
+        await waitForMovementOrFailOnTimeout(eventManager, video, 20);
+
+        // Play for 30 seconds, but stop early if the video ends.
+        await waitForEndOrTimeout(eventManager, video, 30);
 
         if (video.ended) {
-          expect(video.currentTime).toBeCloseTo(video.duration, 1);
+          checkEndedTime();
         } else {
+          // Expect that in 30 seconds of playback, we go through at least 20
+          // seconds of content.  This allows for some buffering or network
+          // flake.
           expect(video.currentTime).toBeGreaterThan(20);
-          // If it were very close to duration, why !video.ended?
-          expect(video.currentTime).not.toBeCloseTo(video.duration);
+
+          // Since video.ended is false, we expect the current time to be before
+          // the video duration.
+          expect(video.currentTime).toBeLessThan(video.duration);
 
           if (!player.isLive()) {
-            // Seek and play out the end.
+            // Seek close to the end and play the rest of the content.
             video.currentTime = video.duration - 15;
-            // 30 seconds or video ended, whichever comes first.
-            await waitForTimeOrEnd(video, 40);
 
+            // Wait for the video to start playback again after seeking.  If it
+            // takes longer than 20 seconds, fail the test.
+            await waitForMovementOrFailOnTimeout(eventManager, video, 20);
+
+            // Play for 30 seconds, but stop early if the video ends.
+            await waitForEndOrTimeout(eventManager, video, 30);
+
+            // By now, ended should be true.
             expect(video.ended).toBe(true);
-            expect(video.currentTime).toBeCloseTo(video.duration, 1);
+            checkEndedTime();
           }
         }
-      });
-    }
+      });  // actual test
+    }  // createAssetTest
 
     // The user can run tests on a specific manifest URI that is not in the
     // asset list.
@@ -183,14 +213,20 @@ describe('Player', function() {
       /** @type {Object} */
       const licenseServers = getClientArg('testCustomLicenseServer');
       const keySystems = Object.keys(licenseServers || {});
-      const asset = {
-        source: 'command line',
-        name: 'custom',
-        manifestUri: testCustomAsset,
-        focus: true,
-        licenseServers: licenseServers,
-        drm: keySystems,
-      };
+      const asset = new ShakaDemoAssetInfo(
+          /* name= */ 'custom',
+          /* iconUri= */ '',
+          /* manifestUri= */ testCustomAsset,
+          /* source= */ shakaAssets.Source.CUSTOM);
+      if (keySystems.length) {
+        for (let keySystem of keySystems) {
+          asset.addKeySystem(/** @type {!shakaAssets.KeySystem} */ (keySystem));
+          const licenseServer = licenseServers[keySystem];
+          if (licenseServer) {
+            asset.addLicenseServer(keySystem, licenseServer);
+          }
+        }
+      }
       createAssetTest(asset);
     } else {
       // No custom assets? Create a test for each asset in the demo asset list.
@@ -199,26 +235,25 @@ describe('Player', function() {
   });
 
   /**
-   * @param {!EventTarget} target
-   * @param {number} timeout in seconds, after which the Promise succeeds
-   * @return {!Promise}
+   * Check the video time for videos that we expect to have ended.
    */
-  function waitForTimeOrEnd(target, timeout) {
-    let curEventManager = eventManager;
-    return new Promise(function(resolve, reject) {
-      let callback = function() {
-        curEventManager.unlisten(target, 'ended');
-        resolve();
-      };
-      curEventManager.listen(target, 'ended', callback);
-      Util.delay(timeout).then(callback);
-    });
+  function checkEndedTime() {
+    if (video.currentTime >= video.duration) {
+      // On some platforms, currentTime surpasses duration by more than 0.1s.
+      // For the purposes of this test, this is fine, so don't set any precise
+      // expectations on currentTime if it's larger.
+    } else {
+      // On some platforms, currentTime is less than duration, but it should be
+      // close.
+      expect(video.currentTime).toBeCloseTo(
+          video.duration, 1 /* decimal place */);
+    }
   }
 
   /**
    * @param {!Object.<string, string>} headers
    * @param {shaka.net.NetworkingEngine.RequestType} requestType
-   * @param {shakaExtern.Request} request
+   * @param {shaka.extern.Request} request
    */
   function addLicenseRequestHeaders(headers, requestType, request) {
     const RequestType = compiledShaka.net.NetworkingEngine.RequestType;

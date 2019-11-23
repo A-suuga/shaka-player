@@ -18,11 +18,10 @@
 
 /**
  * @fileoverview Externs for MediaSession based on
- * {@link https://goo.gl/8QS094 Editor's Draft, 12 January 2017}
+ * {@link https://bit.ly/2Id3dGD Editor's Draft, 12 January 2017}
  *
  * @externs
  */
-
 
 
 /**
@@ -35,5 +34,20 @@ var MediaMetadata = function(options) {};
 MediaMetadata.prototype.title;
 
 
-/** @type {MediaMetadata} */
+/** @type {string} */
+MediaMetadata.prototype.artist;
+
+
+/** @type {string} */
+MediaMetadata.prototype.artwork;
+
+
+/** @constructor */
+var MediaSession = function() {};
+
+/** @type {?MediaMetadata} */
+MediaSession.prototype.metadata;
+
+
+/** @type {MediaSession} */
 Navigator.prototype.mediaSession;

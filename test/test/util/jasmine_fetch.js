@@ -48,6 +48,10 @@ jasmine.Fetch.install = function() {
   jasmine.Fetch.container_.oldFetch = window.fetch;
   jasmine.Fetch.container_.oldHeaders = window.Headers;
   jasmine.Fetch.container_.oldAbortController = window.AbortController;
+  jasmine.Fetch.container_.oldResponse = window.Response;
+  jasmine.Fetch.container_.oldReadableStream = window.ReadableStream;
+  /** @type {!Response} */
+  jasmine.Fetch.container_.latestResponse;
 
   window.Headers = /** @type {function (new:Headers,
         (!Array<!Array<string>>|Headers|Object<string,string>)=)} */(
@@ -55,6 +59,12 @@ jasmine.Fetch.install = function() {
 
   window.AbortController = /** @type {function (new:AbortController)} */
       (jasmine.Fetch.AbortController);
+
+  window.Response = /** @type {function (new:Response)} */
+      (jasmine.Fetch.Response);
+
+  window.ReadableStream = /** @type {function (new:ReadableStream)} */
+      (jasmine.Fetch.ReadableStream);
 
   window.fetch = function(input, init) {
     // TODO: this does not support input in Request form
@@ -104,7 +114,7 @@ jasmine.Fetch.impl_ = function(url, init) {
     method: init.method,
     requestHeaders: headers,
     withCredentials: init.credentials == 'include',
-    aborted: false
+    aborted: false,
   });
   jasmine.Fetch.container_.lastFetchRequestStub = newStub;
 
@@ -121,18 +131,35 @@ jasmine.Fetch.impl_ = function(url, init) {
       responseHeaders.append(key, stubbed.response.responseHeaders[key]);
     }
 
+    let body = {
+      getReader: () => {
+        let sequence = [{
+          done: false, value: {byteLength: 100},
+        }, {
+          done: true, value: null,
+        }];
+        let read = () => {
+          return Promise.resolve(sequence.shift());
+        };
+        return {read: read};
+      },
+    };
+
     // This creates an anonymous object instead of using the
     // built-in response constructor, because the fetch API
     // does not include a very good constructor for Response.
     let response = /** @type {!Response} */ ({
       status: stubbed.response.status,
+      body: body,
       headers: responseHeaders,
       url: stubbed.response.responseURL || url,
       arrayBuffer: function() {
         return Promise.resolve(stubbed.response.response);
-      }
+      },
+      clone: () => response,
     });
-    return Promise.resolve(response);
+    jasmine.Fetch.container_.latestResponse = response;
+    return Promise.resolve(jasmine.Fetch.container_.latestResponse);
   } else if (stubbed.error) {
     return Promise.reject({message: 'fake error'});
   } else if (stubbed.timeout) {
@@ -162,10 +189,11 @@ jasmine.Fetch.uninstall = function() {
     window.fetch = jasmine.Fetch.container_.oldFetch;
     window.Headers = jasmine.Fetch.container_.oldHeaders;
     window.AbortController = jasmine.Fetch.container_.oldAbortController;
+    window.Response = jasmine.Fetch.container_.oldResponse;
+    window.ReadableStream = jasmine.Fetch.container_.oldReadableStream;
     jasmine.Fetch.container_.installed_ = false;
   }
 };
-
 
 
 /**
@@ -181,6 +209,37 @@ jasmine.Fetch.AbortController = function() {
 
 
 /**
+ * @param {!Object} underlyingSource
+ * @constructor
+ * @struct
+ */
+jasmine.Fetch.ReadableStream = function(underlyingSource) {
+  const noop = () => {};
+  let controller = {
+    close: noop,
+    enqueue: noop,
+  };
+  underlyingSource.start(controller);
+};
+
+
+/**
+ * @constructor
+ * @struct
+ */
+jasmine.Fetch.Response = function() {
+  // Returns a copy of the most recent fake response.
+  const latest = jasmine.Fetch.container_.latestResponse;
+  this.status = latest.status;
+  this.body = latest.body;
+  this.headers = latest.headers;
+  this.url = latest.url;
+  let arrayBuffer = latest.arrayBuffer;
+  this.arrayBuffer = () => arrayBuffer;
+};
+
+
+/**
  * Aborts any request that has been supplied the AbortController's signal.
  */
 jasmine.Fetch.AbortController.prototype.abort = function() {
@@ -188,18 +247,16 @@ jasmine.Fetch.AbortController.prototype.abort = function() {
 };
 
 
-
 /**
- * @param {(!Array<!Array<string>>|Headers|Object<string,string>)=} opt_headers
+ * @param {(!Array<!Array<string>>|Headers|Object<string,string>)=} headers
  *
  * @constructor
  * @struct
  */
-jasmine.Fetch.Headers = function(opt_headers) {
+jasmine.Fetch.Headers = function(headers) {
   this.contents = {};
 
-  if (opt_headers) {
-    let headers = opt_headers;
+  if (headers) {
     if (headers instanceof jasmine.Fetch.Headers) {
       // Extract contents, to be read as a generic object below.
       headers = headers.contents;
@@ -251,7 +308,7 @@ jasmine.Fetch.Headers.prototype.keys = function() {
       return index < contentsNames.length ?
           {value: contentsNames[index++], done: false} :
           {done: true};
-    }
+    },
   };
 };
 
@@ -287,7 +344,6 @@ jasmine.Fetch.stubRequest = function(url) {
 jasmine.Fetch.requests.mostRecent = function() {
   return jasmine.Fetch.container_.lastFetchRequestStub;
 };
-
 
 
 /**

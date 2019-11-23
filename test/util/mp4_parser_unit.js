@@ -21,6 +21,7 @@ describe('Mp4Parser', function() {
   let boxData;
   let fullBoxData;
   let boxWithChildData;
+  let fullBoxWithChildData;
   let boxWithSampleDescription;
   let partialBoxWithSampleDescription;
   let multipleSingleLevelBoxes;
@@ -30,7 +31,7 @@ describe('Mp4Parser', function() {
     boxData = new Uint8Array([
       0x00, 0x00, 0x00, 0x0C, // size
       0x62, 0x30, 0x30, 0x31, // type
-      0x00, 0x11, 0x22, 0x33  // payload
+      0x00, 0x11, 0x22, 0x33,  // payload
     ]).buffer;
 
     fullBoxData = new Uint8Array([
@@ -38,7 +39,7 @@ describe('Mp4Parser', function() {
       0x62, 0x30, 0x30, 0x31, // type
       0x01,                   // version
       0x12, 0x34, 0x56,       // flags
-      0x00, 0x11, 0x22, 0x33  // payload
+      0x00, 0x11, 0x22, 0x33,  // payload
     ]).buffer;
 
     boxWithChildData = new Uint8Array([
@@ -49,8 +50,21 @@ describe('Mp4Parser', function() {
       0x00, 0x11, 0x22, 0x33, // child [0] payload
       0x00, 0x00, 0x00, 0x0C, // child [1] size
       0x62, 0x30, 0x33, 0x32, // child [1] type
-      0x44, 0x55, 0x66, 0x77  // child [1] payload
+      0x44, 0x55, 0x66, 0x77,  // child [1] payload
     ]).buffer;
+
+    fullBoxWithChildData = new Uint8Array([
+      0x00, 0x00, 0x00, 0x18, // size
+      0x62, 0x30, 0x30, 0x33, // type
+      0x01,                   // version
+      0x12, 0x34, 0x56,       // flags
+      0x00, 0x00, 0x00, 0x0C, // child [0] size
+      0x62, 0x30, 0x33, 0x31, // child [0] type
+      0x00, 0x11, 0x22, 0x33, // child [0] payload
+      0x00, 0x00, 0x00, 0x0C, // child [1] size
+      0x62, 0x30, 0x33, 0x32, // child [1] type
+      0x44, 0x55, 0x66, 0x77,  // child [1] payload
+    ]);
 
     boxWithSampleDescription = new Uint8Array([
       0x00, 0x00, 0x00, 0x24, // size
@@ -61,7 +75,7 @@ describe('Mp4Parser', function() {
       0x00, 0x11, 0x22, 0x33, // child [0] payload
       0x00, 0x00, 0x00, 0x0C, // child [1] size
       0x62, 0x30, 0x33, 0x33, // child [1] type
-      0x44, 0x55, 0x66, 0x77  // child [1] payload
+      0x44, 0x55, 0x66, 0x77,  // child [1] payload
     ]).buffer;
 
     partialBoxWithSampleDescription = new Uint8Array([
@@ -70,7 +84,7 @@ describe('Mp4Parser', function() {
       0x00, 0x00, 0x00, 0x02, // number of chidren
       0x00, 0x00, 0x00, 0x0C, // child [0] size
       0x62, 0x30, 0x33, 0x32, // child [0] type
-      0x00, 0x11, 0x22, 0x33  // child [0] payload
+      0x00, 0x11, 0x22, 0x33,  // child [0] payload
       // Omit child [1]
     ]).buffer;
 
@@ -86,7 +100,7 @@ describe('Mp4Parser', function() {
       0x00, 0x11, 0x22, 0x33, // box [2] payload
       0x00, 0x00, 0x00, 0x0C, // box [3] size
       0x62, 0x30, 0x30, 0x34, // box [3] type
-      0x00, 0x11, 0x22, 0x33  // box [3] payload
+      0x00, 0x11, 0x22, 0x33,  // box [3] payload
     ]).buffer;
 
     twoLevelBoxStructure = new Uint8Array([
@@ -109,7 +123,7 @@ describe('Mp4Parser', function() {
       0x62, 0x30, 0x34, 0x30, // box [3] type
       0x00, 0x00, 0x00, 0x0C, // box [3] [0] size
       0x62, 0x30, 0x34, 0x31, // box [3] [0] type
-      0x00, 0x11, 0x22, 0x33  // box [3] [0] payload
+      0x00, 0x11, 0x22, 0x33,  // box [3] [0] payload
     ]).buffer;
   });
 
@@ -117,6 +131,7 @@ describe('Mp4Parser', function() {
     it('reads box header', function() {
       let callback = jasmine.createSpy('parser callback').and.callFake(
           function(box) {
+            expect(box.start).toBe(0);
             expect(box.size).toEqual(12);
             expect(box.version).toEqual(null);
             expect(box.flags).toEqual(null);
@@ -131,6 +146,7 @@ describe('Mp4Parser', function() {
     it('reads full box header', function() {
       let callback = jasmine.createSpy('parser callback').and.callFake(
           function(box) {
+            expect(box.start).toBe(0);
             expect(box.size).toEqual(16);
             expect(box.version).toEqual(1);
             expect(box.flags).toEqual(0x123456);
@@ -148,19 +164,8 @@ describe('Mp4Parser', function() {
       let parentBox = jasmine.createSpy('parent box').and.callFake(
           shaka.util.Mp4Parser.children);
 
-      let childBox1 = jasmine.createSpy('child box 1').and.callFake(
-          function(box) {
-            expect(box.size).toEqual(12);
-            expect(box.version).toEqual(null);
-            expect(box.flags).toEqual(null);
-          });
-
-      let childBox2 = jasmine.createSpy('child box 2').and.callFake(
-          function(box) {
-            expect(box.size).toEqual(12);
-            expect(box.version).toEqual(null);
-            expect(box.flags).toEqual(null);
-          });
+      const childBox1 = jasmine.createSpy('child box 1');
+      const childBox2 = jasmine.createSpy('child box 2');
 
       new shaka.util.Mp4Parser()
           .box('b003', Util.spyFunc(parentBox))
@@ -168,8 +173,45 @@ describe('Mp4Parser', function() {
           .box('b032', Util.spyFunc(childBox2)).parse(boxWithChildData);
 
       expect(parentBox).toHaveBeenCalled();
-      expect(childBox1).toHaveBeenCalled();
-      expect(childBox2).toHaveBeenCalled();
+      expect(childBox1).toHaveBeenCalledWith(jasmine.objectContaining({
+        start: 8,
+        size: 12,
+        version: null,
+        flags: null,
+      }));
+      expect(childBox2).toHaveBeenCalledWith(jasmine.objectContaining({
+        start: 20,
+        size: 12,
+        version: null,
+        flags: null,
+      }));
+    });
+
+    it('reads children definition with full boxes', () => {
+      const parentBox = jasmine.createSpy('parent box').and.callFake(
+          shaka.util.Mp4Parser.children);
+
+      const childBox1 = jasmine.createSpy('child box 1');
+      const childBox2 = jasmine.createSpy('child box 2');
+
+      new shaka.util.Mp4Parser()
+          .fullBox('b003', Util.spyFunc(parentBox))
+          .box('b031', Util.spyFunc(childBox1))
+          .box('b032', Util.spyFunc(childBox2)).parse(fullBoxWithChildData);
+
+      expect(parentBox).toHaveBeenCalled();
+      expect(childBox1).toHaveBeenCalledWith(jasmine.objectContaining({
+        start: 12,
+        size: 12,
+        version: null,
+        flags: null,
+      }));
+      expect(childBox2).toHaveBeenCalledWith(jasmine.objectContaining({
+        start: 24,
+        size: 12,
+        version: null,
+        flags: null,
+      }));
     });
 
     it('stops reading children when asked to', function() {
@@ -222,7 +264,19 @@ describe('Mp4Parser', function() {
 
       expect(parentBox).toHaveBeenCalledTimes(1);
       expect(childBox1).toHaveBeenCalledTimes(1);
+      expect(childBox1).toHaveBeenCalledWith(jasmine.objectContaining({
+        start: 12,
+        size: 12,
+        version: null,
+        flags: null,
+      }));
       expect(childBox2).toHaveBeenCalledTimes(1);
+      expect(childBox2).toHaveBeenCalledWith(jasmine.objectContaining({
+        start: 24,
+        size: 12,
+        version: null,
+        flags: null,
+      }));
     });
 
     it('stops reading sample description when asked to', function() {

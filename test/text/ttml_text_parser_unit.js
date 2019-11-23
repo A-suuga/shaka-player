@@ -25,6 +25,12 @@ describe('TtmlTextParser', function() {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
+  it('supports empty text string', () => {
+    verifyHelper([],
+        '',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
   it('supports div with no cues but whitespace', function() {
     verifyHelper(
         [],
@@ -43,45 +49,80 @@ describe('TtmlTextParser', function() {
     // When xml:space="default", ignore whitespace outside tags.
     verifyHelper(
         [
-          {start: 62.03, end: 62.05, payload: 'A B C'}
+          {
+            start: 62.03,
+            end: 62.05,
+            payload: '',
+            nestedCues: [{payload: 'A B C'}],
+          },
         ],
         '<tt xml:space="default">' + ttBody + '</tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     // When xml:space="preserve", take them into account.
     verifyHelper(
         [
-          {start: 62.03, end: 62.05, payload: '\n       A    B   C  \n    '}
+          {
+            start: 62.03,
+            end: 62.05,
+            payload: '',
+            nestedCues: [{payload: ' A    B   C  '}],
+          },
         ],
         '<tt xml:space="preserve">' + ttBody + '</tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     // The default value for xml:space is "default".
     verifyHelper(
         [
-          {start: 62.03, end: 62.05, payload: 'A B C'}
+          {
+            start: 62.03,
+            end: 62.05,
+            payload: '',
+            nestedCues: [{payload: 'A B C'}],
+          },
         ],
         '<tt>' + ttBody + '</tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     // Any other value is rejected as an error.
     errorHelper(shaka.util.Error.Code.INVALID_XML,
-                '<tt xml:space="invalid">' + ttBody + '</tt>');
+        '<tt xml:space="invalid">' + ttBody + '</tt>',
+        jasmine.any(String));
   });
 
-  it('rejects invalid ttml', function() {
-    errorHelper(shaka.util.Error.Code.INVALID_XML, '<test></test>');
-    errorHelper(shaka.util.Error.Code.INVALID_XML, '');
+  it('rejects invalid ttml', () => {
+    const anyString = jasmine.any(String);
+    errorHelper(shaka.util.Error.Code.INVALID_XML, '<test></test>', anyString);
   });
 
   it('rejects invalid time format', function() {
     errorHelper(shaka.util.Error.Code.INVALID_TEXT_CUE,
-                '<tt><body><p begin="test" end="test"></p></body></tt>');
+        '<tt><body><p begin="test" end="test">My very own cue</p></body></tt>');
     errorHelper(shaka.util.Error.Code.INVALID_TEXT_CUE,
-                '<tt><body><p begin="3.45" end="1a"></p></body></tt>');
+        '<tt><body><p begin="3.45" end="1a">An invalid cue</p></body></tt>');
+  });
+
+  it('supports spans as nestedCues of paragraphs', () => {
+    verifyHelper(
+        [
+          {
+            start: 62.05,
+            end: 3723.2,
+            payload: '',
+            nestedCues: [
+              {payload: 'First cue'},
+              {payload: '', spacer: true},
+              {payload: 'Second cue'},
+            ],
+          },
+        ],
+        '<tt><body><p begin="01:02.05" end="01:02:03.200">' +
+        '<span>First cue</span><br /><span>Second cue</span></p></body></tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
   it('supports colon formatted time', function() {
     verifyHelper(
         [
-          {start: 62.05, end: 3723.2, payload: 'Test'}
+          {start: 62.05, end: 3723.2, payload: 'Test'},
         ],
         '<tt><body><p begin="01:02.05" ' +
         'end="01:02:03.200">Test</p></body></tt>',
@@ -91,7 +132,7 @@ describe('TtmlTextParser', function() {
   it('accounts for offset', function() {
     verifyHelper(
         [
-          {start: 69.05, end: 3730.2, payload: 'Test'}
+          {start: 69.05, end: 3730.2, payload: 'Test'},
         ],
         '<tt><body><p begin="01:02.05" ' +
         'end="01:02:03.200">Test</p></body></tt>',
@@ -101,7 +142,7 @@ describe('TtmlTextParser', function() {
   it('supports time in 0.00h 0.00m 0.00s format', function() {
     verifyHelper(
         [
-          {start: 3567.03, end: 5402.3, payload: 'Test'}
+          {start: 3567.03, end: 5402.3, payload: 'Test'},
         ],
         '<tt><body><p begin="59.45m30ms" ' +
         'end="1.5h2.3s">Test</p></body></tt>',
@@ -111,7 +152,7 @@ describe('TtmlTextParser', function() {
   it('supports time with frame rate', function() {
     verifyHelper(
         [
-          {start: 615.5, end: 663, payload: 'Test'}
+          {start: 615.5, end: 663, payload: 'Test'},
         ],
         '<tt xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
         'ttp:frameRate="30"> ' +
@@ -125,7 +166,7 @@ describe('TtmlTextParser', function() {
   it('supports time with frame rate multiplier', function() {
     verifyHelper(
         [
-          {start: 615.5, end: 663, payload: 'Test'}
+          {start: 615.5, end: 663, payload: 'Test'},
         ],
         '<tt xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
         'ttp:frameRate="60" ' +
@@ -140,7 +181,7 @@ describe('TtmlTextParser', function() {
   it('supports time with subframes', function() {
     verifyHelper(
         [
-          {start: 615.517, end: 663, payload: 'Test'}
+          {start: 615.517, end: 663, payload: 'Test'},
         ],
         '<tt xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
         'ttp:frameRate="30" ' +
@@ -155,7 +196,7 @@ describe('TtmlTextParser', function() {
   it('supports time in frame format', function() {
     verifyHelper(
         [
-          {start: 2.5, end: 10.01, payload: 'Test'}
+          {start: 2.5, end: 10.01, payload: 'Test'},
         ],
         '<tt xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
         'ttp:frameRate="60" ' +
@@ -170,7 +211,7 @@ describe('TtmlTextParser', function() {
   it('supports time in tick format', function() {
     verifyHelper(
         [
-          {start: 5, end: 6.02, payload: 'Test'}
+          {start: 5, end: 6.02, payload: 'Test'},
         ],
         '<tt xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
         'ttp:frameRate="60" ' +
@@ -185,7 +226,7 @@ describe('TtmlTextParser', function() {
   it('supports time with duration', function() {
     verifyHelper(
         [
-          {start: 62.05, end: 67.05, payload: 'Test'}
+          {start: 62.05, end: 67.05, payload: 'Test'},
         ],
         '<tt><body><p begin="01:02.05" ' +
         'dur="5s">Test</p></body></tt>',
@@ -199,8 +240,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            lineAlign: Cue.textAlign.START
-          }
+            lineAlign: Cue.textAlign.START,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -241,8 +282,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            lineAlign: Cue.textAlign.END
-          }
+            lineAlign: Cue.textAlign.END,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -265,8 +306,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            lineAlign: Cue.textAlign.END
-          }
+            lineAlign: Cue.textAlign.END,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -294,9 +335,9 @@ describe('TtmlTextParser', function() {
              viewportAnchorX: 50,
              viewportAnchorY: 16,
              width: 100,
-             height: 100
-           }
-         }
+             height: 100,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -317,9 +358,9 @@ describe('TtmlTextParser', function() {
              viewportAnchorX: 50,
              viewportAnchorY: 16,
              width: 100,
-             height: 100
-           }
-         }
+             height: 100,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -341,9 +382,9 @@ describe('TtmlTextParser', function() {
              viewportAnchorX: 50,
              viewportAnchorY: 16,
              width: 100,
-             height: 100
-           }
-         }
+             height: 100,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -375,9 +416,9 @@ describe('TtmlTextParser', function() {
              heightUnits: CueRegion.units.PERCENTAGE,
              widthUnits: CueRegion.units.PERCENTAGE,
              viewportAnchorUnits: CueRegion.units.PX,
-             scroll: CueRegion.scrollMode.NONE
-           }
-         }
+             scroll: CueRegion.scrollMode.NONE,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -405,9 +446,9 @@ describe('TtmlTextParser', function() {
              heightUnits: CueRegion.units.PX,
              widthUnits: CueRegion.units.PX,
              viewportAnchorUnits: CueRegion.units.PERCENTAGE,
-             scroll: CueRegion.scrollMode.NONE
-            }
-         }
+             scroll: CueRegion.scrollMode.NONE,
+            },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -433,9 +474,9 @@ describe('TtmlTextParser', function() {
              viewportAnchorX: 50,
              viewportAnchorY: 16,
              width: 100,
-             height: 100
-           }
-         }
+             height: 100,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -457,9 +498,9 @@ describe('TtmlTextParser', function() {
              viewportAnchorX: 50,
              viewportAnchorY: 16,
              width: 100,
-             height: 100
-           }
-         }
+             height: 100,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -481,9 +522,9 @@ describe('TtmlTextParser', function() {
              viewportAnchorX: 50,
              viewportAnchorY: 16,
              width: 100,
-             height: 100
-           }
-         }
+             height: 100,
+           },
+         },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -497,15 +538,43 @@ describe('TtmlTextParser', function() {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
-  it('supports writingDirection setting', function() {
+  it('supports percentages containing decimals', () => {
     verifyHelper(
         [
           {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            region: {
+              id: 'subtitleArea',
+              viewportAnchorX: 12.2,
+              viewportAnchorY: 50.005,
+              width: 100,
+              height: 100,
+            },
+          },
+        ],
+        '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
+        '<layout>' +
+        '<region xml:id="subtitleArea" tts:origin="12.2% 50.005%" ' +
+        'tts:writingMode="tb" />' +
+        '</layout>' +
+        '<body region="subtitleArea">' +
+        '<p begin="01:02.05" end="01:02:03.200">Test</p>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('supports writingMode setting', function() {
+    verifyHelper(
+        [
+          {
+            start: 62.05,
+            end: 3723.2,
+            payload: 'Test',
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -523,8 +592,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            writingDirection: Cue.writingDirection.VERTICAL_RIGHT_TO_LEFT
-          }
+            writingMode: Cue.writingMode.VERTICAL_RIGHT_TO_LEFT,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -542,8 +611,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -561,8 +630,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            writingDirection: Cue.writingDirection.HORIZONTAL_RIGHT_TO_LEFT
-          }
+            direction: Cue.direction.HORIZONTAL_RIGHT_TO_LEFT,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -580,8 +649,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            writingDirection: Cue.writingDirection.HORIZONTAL_LEFT_TO_RIGHT
-          }
+            direction: Cue.direction.HORIZONTAL_LEFT_TO_RIGHT,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<layout>' +
@@ -598,7 +667,7 @@ describe('TtmlTextParser', function() {
   it('disregards empty divs and ps', function() {
     verifyHelper(
         [
-          {start: 62.05, end: 3723.2, payload: 'Test'}
+          {start: 62.05, end: 3723.2, payload: 'Test'},
         ],
         '<tt>' +
         '<body>' +
@@ -611,7 +680,7 @@ describe('TtmlTextParser', function() {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     verifyHelper(
         [
-          {start: 62.05, end: 3723.2, payload: 'Test'}
+          {start: 62.05, end: 3723.2, payload: 'Test'},
         ],
         '<tt>' +
         '<body>' +
@@ -635,20 +704,68 @@ describe('TtmlTextParser', function() {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
-  it('inserts newline characters into <br> tags', function() {
+  it('should let empty paragraphs with begin or end attributes through', () => {
     verifyHelper(
         [
-          {start: 62.05, end: 3723.2, payload: 'Line1\nLine2'}
+          {start: 62.05, end: 3723.2, payload: ''},
+        ],
+        '<tt>' +
+        '<body>' +
+        '<div>' +
+        '<p begin="01:02.05" end="01:02:03.200" />' +
+        '<p></p>' +
+        '</div>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('supports smpte:backgroundImage attribute', () => {
+    verifyHelper(
+        [
+          {
+            start: 62.05,
+            end: 3723.2,
+            payload: '',
+            backgroundImage: 'data:image/png;base64,base64EncodedImage',
+          },
+        ],
+        '<tt ' +
+        'xmlns:ttm="http://www.w3.org/ns/ttml#metadata" ' +
+        'xmlns:smpte="http://www.smpte-ra.org/schemas/2052-1/2010/smpte-tt">' +
+        '<metadata>' +
+        '<smpte:image imagetype="PNG" encoding="Base64" xml:id="img_0">' +
+        'base64EncodedImage</smpte:image>' +
+        '</metadata>' +
+        '<body>' +
+        '<div>' +
+        '<p begin="01:02.05" end="01:02:03.200" ' +
+        'smpte:backgroundImage="#img_0" />' +
+        '</div>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('inserts newline characters into <br> tags', () => {
+    verifyHelper(
+        [
+          {start: 62.05, end: 3723.2, payload: 'Line1\nLine2'},
         ],
         '<tt><body><p begin="01:02.05" ' +
         'end="01:02:03.200">Line1<br/>Line2</p></body></tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     verifyHelper(
         [
-          {start: 62.05, end: 3723.2, payload: 'Line1\nLine2'}
+          {
+            start: 62.05,
+            end: 3723.2,
+            payload: '',
+            nestedCues: [{payload: 'Line1\nLine2'}],
+          },
         ],
         '<tt><body><p begin="01:02.05" ' +
-        'end="01:02:03.200"><span>Line1<br/>Line2</span></p></body></tt>',
+            'end="01:02:03.200"><span>Line1<br/>Line2</span></p></body></tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
@@ -661,8 +778,8 @@ describe('TtmlTextParser', function() {
             payload: 'Test',
             lineAlign: Cue.lineAlign.START,
             textAlign: Cue.textAlign.LEFT,
-            positionAlign: Cue.positionAlign.LEFT
-          }
+            positionAlign: Cue.positionAlign.LEFT,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -691,8 +808,8 @@ describe('TtmlTextParser', function() {
             fontFamily: 'Times New Roman',
             fontStyle: Cue.fontStyle.ITALIC,
             lineHeight: '20px',
-            fontSize: '10em'
-          }
+            fontSize: '10em',
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -721,8 +838,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            wrapLine: false
-          }
+            wrapLine: false,
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -746,8 +863,8 @@ describe('TtmlTextParser', function() {
             end: 3723.2,
             payload: 'Test',
             textDecoration: [Cue.textDecoration.UNDERLINE,
-                             Cue.textDecoration.OVERLINE]
-          }
+                             Cue.textDecoration.OVERLINE],
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -772,8 +889,8 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: 'Test',
-            color: 'blue'
-          }
+            color: 'blue',
+          },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
         '<styling>' +
@@ -794,13 +911,13 @@ describe('TtmlTextParser', function() {
   /**
    * @param {!Array} cues
    * @param {string} text
-   * @param {shakaExtern.TextParser.TimeContext} time
+   * @param {shaka.extern.TextParser.TimeContext} time
    */
   function verifyHelper(cues, text, time) {
     let data = new Uint8Array(shaka.util.StringUtils.toUTF8(text));
     let result = new shaka.text.TtmlTextParser().parseMedia(data, time);
     let properties = ['textAlign', 'lineAlign', 'positionAlign', 'size',
-                      'line', 'position', 'writingDirection', 'color',
+                      'line', 'position', 'direction', 'color', 'writingMode',
                       'backgroundColor', 'fontWeight', 'fontFamily',
                       'wrapLine', 'lineHeight', 'fontStyle', 'fontSize'];
     expect(result).toBeTruthy();
@@ -812,6 +929,10 @@ describe('TtmlTextParser', function() {
 
       if (cues[i].region) {
         verifyRegion(cues[i].region, result[i].region);
+      }
+      if (cues[i].nestedCues) {
+        expect(result[i].nestedCues).toEqual(
+            cues[i].nestedCues.map((c) => jasmine.objectContaining(c)));
       }
 
       for (let j = 0; j < properties.length; j++) {
@@ -833,7 +954,7 @@ describe('TtmlTextParser', function() {
 
   /**
    * @param {!Object} expected
-   * @param {shakaExtern.CueRegion} actual
+   * @param {shaka.extern.CueRegion} actual
    */
   function verifyRegion(expected, actual) {
     let properties = ['id', 'viewportAnchorX', 'viewportAnchorY',
@@ -854,19 +975,27 @@ describe('TtmlTextParser', function() {
   /**
    * @param {shaka.util.Error.Code} code
    * @param {string} text
+   * @param {*=} errorData
    */
-  function errorHelper(code, text) {
-    let error = new shaka.util.Error(
-        shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
-        code);
-    let data = shaka.util.StringUtils.toUTF8(text);
+  function errorHelper(code, text, errorData = undefined) {
+    let shakaError;
+    if (errorData) {
+      shakaError = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
+          code, errorData);
+    } else {
+      shakaError = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
+          code);
+    }
+    const data = shaka.util.StringUtils.toUTF8(text);
     try {
       new shaka.text.TtmlTextParser().parseMedia(
           new Uint8Array(data),
           {periodStart: 0, segmentStart: 0, segmentEnd: 0});
       fail('Invalid TTML file supported');
     } catch (e) {
-      shaka.test.Util.expectToEqualError(e, error);
+      shaka.test.Util.expectToEqualError(e, shakaError);
     }
   }
 });

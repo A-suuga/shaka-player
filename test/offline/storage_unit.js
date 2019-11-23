@@ -53,7 +53,7 @@ describe('Storage', function() {
       // Use a real Player since Storage only uses the configuration and
       // networking engine.  This allows us to use Player.configure in these
       // tests.
-      player = new shaka.Player(new shaka.test.FakeVideo());
+      player = new shaka.Player();
     });
 
     afterEach(async function() {
@@ -77,7 +77,7 @@ describe('Storage', function() {
       });
 
       // Ask storage to erase everything.
-      await shaka.offline.Storage.deleteAll(player);
+      await shaka.offline.Storage.deleteAll();
 
       // Make sure that all content that was previously found is no gone.
       await withStorage(async (storage) => {
@@ -87,63 +87,20 @@ describe('Storage', function() {
       });
     }));
 
-    drm_it('removes licenses', drmCheckAndRun(async function() {
-      const TestManifestParser = shaka.test.TestScheme.ManifestParser;
-      const manifestUri = 'test:sintel-enc';
-
-      // PART 1 - Store a piece of content.
-      let storedContent = await withStorage((storage) => {
-        return storage.store(manifestUri, noMetadata, TestManifestParser);
-      });
-
-      let offlineUri = shaka.offline.OfflineUri.parse(storedContent.offlineUri);
-      goog.asserts.assert(offlineUri, 'Store should give us a valid uri');
-      expect(offlineUri).toBeTruthy();
-      expect(offlineUri.isManifest()).toBeTruthy();
-
-      /** @type {!shakaExtern.Manifest} */
-      let manifest = await getStoredManifest(offlineUri);
-      expect(manifest);
-      expect(manifest.offlineSessionIds).toBeTruthy();
-      expect(manifest.offlineSessionIds.length).toBeTruthy();
-
-      // PART 2 - Check that the licences are stored.
-      await withDrm(player, manifest, (drm) => {
-        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
-          let foundSession = await loadOfflineSession(drm, session);
-          expect(foundSession).toBeTruthy();
-        }));
-      });
-
-      // PART 3 - Ask storage to erase everything.
-      await shaka.offline.Storage.deleteAll(player);
-
-      // PART 4 - Check that the licenses were removed.
-      try {
-        await withDrm(player, manifest, (drm) => {
-          return Promise.all(manifest.offlineSessionIds.map(async (session) => {
-            let notFoundSession = await loadOfflineSession(drm, session);
-            expect(notFoundSession).toBeFalsy();
-          }));
-        });
-
-        return Promise.reject('Expected drm to throw OFFLINE_SESSION_REMOVED');
-      } catch (e) {
-        expect(e).toBeTruthy();
-        expect(e.code).toBe(shaka.util.Error.Code.OFFLINE_SESSION_REMOVED);
-      }
-    }));
-
     /**
      * @param {function(!shaka.offline.Storage)|
      *         function(!shaka.offline.Storage):!Promise} action
      * @return {!Promise}
      */
-    function withStorage(action) {
-      let storage = new shaka.offline.Storage(player);
-      return shaka.util.IDestroyable.with([storage], () => {
-        return action(storage);
-      });
+    async function withStorage(action) {
+      /** @type {!shaka.offline.Storage} */
+      const storage = new shaka.offline.Storage(player);
+
+      try {
+        await action(storage);
+      } finally {
+        await storage.destroy();
+      }
     }
   });
 
@@ -157,7 +114,7 @@ describe('Storage', function() {
       // Use a real Player since Storage only uses the configuration and
       // networking engine.  This allows us to use Player.configure in these
       // tests.
-      player = new shaka.Player(new shaka.test.FakeVideo());
+      player = new shaka.Player();
       storage = new shaka.offline.Storage(player);
     });
 
@@ -166,7 +123,15 @@ describe('Storage', function() {
       await player.destroy();
     });
 
-    drm_it('removes persistent license', drmCheckAndRun(async function() {
+    // TODO: Make a test to ensure that setting delayLicenseRequestUntilPlayed
+    // to true doesn't break storage, once we have working tests for storing DRM
+    // content.
+    // See issue #2218.
+
+    // Quarantined due to http://crbug.com/1019298 where a load cannot happen
+    // immediately after a remove.  This can sometimes be fixed with a delay,
+    // but it is extremely flaky, so these are disabled until the bug is fixed.
+    quarantinedIt('removes persistent license', drmCheckAndRun(async () => {
       const TestManifestParser = shaka.test.TestScheme.ManifestParser;
 
       // PART 1 - Download and store content that has a persistent license
@@ -186,7 +151,7 @@ describe('Storage', function() {
       // PART 2 - Check that the licences are stored.
       await withDrm(player, manifest, (drm) => {
         return Promise.all(manifest.offlineSessionIds.map(async (session) => {
-          let foundSession = await loadOfflineSession(drm, session);
+          const foundSession = await loadOfflineSession(drm, session);
           expect(foundSession).toBeTruthy();
         }));
       });
@@ -210,10 +175,69 @@ describe('Storage', function() {
         expect(e.code).toBe(shaka.util.Error.Code.OFFLINE_SESSION_REMOVED);
       }
     }));
+
+    quarantinedIt('defers removing licenses on error', drmCheckAndRun(
+      async () => {
+      const TestManifestParser = shaka.test.TestScheme.ManifestParser;
+
+      // PART 1 - Download and store content that has a persistent license
+      //          associated with it.
+      const stored = await storage.store(
+          'test:sintel-enc', noMetadata, TestManifestParser);
+      expect(stored.offlineUri).toBeTruthy();
+
+      /** @type {shaka.offline.OfflineUri} */
+      const uri = shaka.offline.OfflineUri.parse(stored.offlineUri);
+      goog.asserts.assert(uri, 'Stored offline uri should be non-null');
+      const manifest = await getStoredManifest(uri);
+
+      // PART 2 - Add an error so the release license message fails.
+      storage.getNetworkingEngine().registerRequestFilter((type, request) => {
+        if (type == shaka.net.NetworkingEngine.RequestType.LICENSE) {
+          throw new Error('Error should be ignored');
+        }
+      });
+
+      // PART 3 - Remove the manifest from storage. This should ignore the
+      // error with the EME session.  It should also store the session for later
+      // removal.
+      await storage.remove(uri.toString());
+
+      // PART 4 - Verify the media was deleted but the session still exists.
+      const storedContents = await storage.list();
+      expect(storedContents).toEqual([]);
+
+      await withDrm(player, manifest, (drm) => {
+        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+          const foundSession = await loadOfflineSession(drm, session);
+          expect(foundSession).toBeTruthy();
+        }));
+      });
+
+      // PART 5 - Disable the error and remove the EME session.
+      storage.getNetworkingEngine().clearAllRequestFilters();
+      const didRemoveAll = await storage.removeEmeSessions();
+      expect(didRemoveAll).toBe(true);
+
+      // PART 6 - Check that the licenses were removed.
+      try {
+        await withDrm(player, manifest, (drm) => {
+          return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+            const notFoundSession = await loadOfflineSession(drm, session);
+            expect(notFoundSession).toBeFalsy();
+          }));
+        });
+
+        return Promise.reject('Expected drm to throw OFFLINE_SESSION_REMOVED');
+      } catch (e) {
+        expect(e).toBeTruthy();
+        expect(e.code).toBe(shaka.util.Error.Code.OFFLINE_SESSION_REMOVED);
+      }
+    }));
   });
 
   describe('default track selection callback', function() {
-    const select = shaka.offline.Storage.defaultTrackSelect;
+    const PlayerConfiguration = shaka.util.PlayerConfiguration;
 
     it('selects the largest SD video with middle quality audio', function() {
       const tracks = [
@@ -225,7 +249,7 @@ describe('Storage', function() {
         variantTrack(5, 1080, englishUS, 4 * kbps),
       ];
 
-      let selected = select(englishUS, tracks);
+      let selected = PlayerConfiguration.defaultTrackSelect(tracks, englishUS);
       expect(selected).toBeTruthy();
       expect(selected.length).toBe(1);
       expect(selected[0]).toBeTruthy();
@@ -240,7 +264,7 @@ describe('Storage', function() {
         textTrack(1, frenchCanadian),
       ];
 
-      let selected = select(englishUS, tracks);
+      let selected = PlayerConfiguration.defaultTrackSelect(tracks, englishUS);
       expect(selected).toBeTruthy();
       expect(selected.length).toBe(2);
       tracks.forEach((track) => {
@@ -256,7 +280,7 @@ describe('Storage', function() {
           variantTrack(2, 480, 'eng-ca', 1 * kbps),
         ];
 
-        let selected = select('eng-us', tracks);
+        let selected = PlayerConfiguration.defaultTrackSelect(tracks, 'eng-us');
         expect(selected).toBeTruthy();
         expect(selected.length).toBe(1);
         expect(selected[0]).toBeTruthy();
@@ -271,7 +295,7 @@ describe('Storage', function() {
           variantTrack(3, 480, 'eng', 1 * kbps),
         ];
 
-        let selected = select('eng', tracks);
+        let selected = PlayerConfiguration.defaultTrackSelect(tracks, 'eng');
         expect(selected).toBeTruthy();
         expect(selected.length).toBe(1);
         expect(selected[0]).toBeTruthy();
@@ -285,7 +309,7 @@ describe('Storage', function() {
           variantTrack(2, 480, 'eng-ca', 1 * kbps),
         ];
 
-        let selected = select('fr', tracks);
+        let selected = PlayerConfiguration.defaultTrackSelect(tracks, 'fr');
         expect(selected).toBeTruthy();
         expect(selected.length).toBe(1);
         expect(selected[0]).toBeTruthy();
@@ -299,7 +323,7 @@ describe('Storage', function() {
           variantTrack(2, 480, 'eng-ca', 1 * kbps),
         ];
 
-        let selected = select('fr-uk', tracks);
+        let selected = PlayerConfiguration.defaultTrackSelect(tracks, 'fr-uk');
         expect(selected).toBeTruthy();
         expect(selected.length).toBe(1);
         expect(selected[0]).toBeTruthy();
@@ -315,7 +339,7 @@ describe('Storage', function() {
 
         tracks[0].primary = true;
 
-        let selected = select('de', tracks);
+        let selected = PlayerConfiguration.defaultTrackSelect(tracks, 'de');
         expect(selected).toBeTruthy();
         expect(selected.length).toBe(1);
         expect(selected[0]).toBeTruthy();
@@ -324,6 +348,7 @@ describe('Storage', function() {
     });  // describe('language matching')
   });  // describe('default track selection callback')
 
+
   describe('no support', function() {
     /** @type {!shaka.Player} */
     let player;
@@ -331,9 +356,9 @@ describe('Storage', function() {
     let storage;
 
     beforeEach(function() {
-      shaka.offline.StorageMuxer.overrideSupport({});
+      shaka.offline.StorageMuxer.overrideSupport(new Map());
 
-      player = new shaka.Player(new shaka.test.FakeVideo());
+      player = new shaka.Player();
       storage = new shaka.offline.Storage(player);
     });
 
@@ -372,6 +397,253 @@ describe('Storage', function() {
     });
   });
 
+  // Test that progress will be reported as we expect when manifests have
+  // stream-level bandwidth information and when manifests only have
+  // variant-level bandwidth information.
+  //
+  // Since we build our promise chains to allow each stream to be downloaded
+  // in parallel (implementation detail) progress can be non-deterministic
+  // as we see different promise resolution orders between browsers (and
+  // runs). So to control this, we force resolution order for our network
+  // requests in these tests.
+  //
+  // To allow us to control the network order, our manifests for these tests
+  // could not repeat/reuse segments uris.
+  describe('reports progress on store', function() {
+    const audioSegment1Uri = 'audio-segment-1';
+    const audioSegment2Uri = 'audio-segment-2';
+    const audioSegment3Uri = 'audio-segment-3';
+    const audioSegment4Uri = 'audio-segment-4';
+
+    const videoSegment1Uri = 'video-segment-1';
+    const videoSegment2Uri = 'video-segment-2';
+    const videoSegment3Uri = 'video-segment-3';
+    const videoSegment4Uri = 'video-segment-4';
+
+    /** @type {!shaka.Player} */
+    let player;
+    /** @type {!shaka.offline.Storage} */
+    let storage;
+
+    beforeEach(function() {
+      // Use these promises to ensure that the data from networking
+      // engine arrives in the correct order.
+      const delays = {};
+      delays[audioSegment1Uri] = new shaka.util.PublicPromise();
+      delays[audioSegment2Uri] = new shaka.util.PublicPromise();
+      delays[audioSegment3Uri] = new shaka.util.PublicPromise();
+      delays[audioSegment4Uri] = new shaka.util.PublicPromise();
+      delays[videoSegment1Uri] = new shaka.util.PublicPromise();
+      delays[videoSegment2Uri] = new shaka.util.PublicPromise();
+      delays[videoSegment3Uri] = new shaka.util.PublicPromise();
+      delays[videoSegment4Uri] = new shaka.util.PublicPromise();
+
+      /** @type {!shaka.test.FakeNetworkingEngine} */
+      const netEngine = new shaka.test.FakeNetworkingEngine();
+
+      // Since the promise chains will be built so that each stream can be
+      // downloaded in parallel, we can force the network requests to
+      // resolve in lock-step (audio seg 0, video seg 0, audio seg 1,
+      // video seg 1, ...).
+      const setResponseFor = (segment, dependingOn) => {
+        netEngine.setResponse(segment, async () => {
+          if (dependingOn) {
+            await delays[dependingOn];
+          }
+
+          // Tell anyone waiting on |segment| that they are clear to execute
+          // now.
+          delays[segment].resolve();
+          return new ArrayBuffer(16);
+        });
+      };
+      setResponseFor(audioSegment1Uri, /* depending on */ null);
+      setResponseFor(audioSegment2Uri, /* depending on */ videoSegment1Uri);
+      setResponseFor(audioSegment3Uri, /* depending on */ videoSegment2Uri);
+      setResponseFor(audioSegment4Uri, /* depending on */ videoSegment3Uri);
+      setResponseFor(videoSegment1Uri, /* depending on */ audioSegment1Uri);
+      setResponseFor(videoSegment2Uri, /* depending on */ audioSegment2Uri);
+      setResponseFor(videoSegment3Uri, /* depending on */ audioSegment3Uri);
+      setResponseFor(videoSegment4Uri, /* depending on */ audioSegment4Uri);
+
+      // Use a real Player as Storage will use it to get a networking
+      // engine.
+      player = new shaka.Player(null, (player) => {
+        player.createNetworkingEngine = () => netEngine;
+      });
+
+      storage = new shaka.offline.Storage(player);
+      // Since we are using specific manifest with only one video and one audio
+      // we can return all the tracks.
+      storage.configure({
+        offline: {
+          trackSelectionCallback: (tracks) => { return tracks; },
+        },
+      });
+    });
+
+    afterEach(async function() {
+      await storage.destroy();
+      await player.destroy();
+    });
+
+    it('uses stream bandwidth', checkAndRun(async function() {
+      /**
+       * These numbers are the overall progress based on the segment sizes
+       * per stream. We assume a specific download order for the content
+       * based on the order of the streams and segments.
+       *
+       * Since the audio stream has smaller segments, its contribution to
+       * the overall progress is much smaller than the video stream segments.
+       *
+       * @type {!Array.<number>}
+       */
+      const progressSteps = [
+        0.057, 0.250, 0.307, 0.500, 0.557, 0.750, 0.807, 1.000,
+      ];
+      const manifest = makeWithStreamBandwidth();
+      await runProgressTest(manifest, progressSteps);
+    }));
+
+    it('uses variant bandwidth when stream bandwidth is unavailable',
+        checkAndRun(async function() {
+          /**
+           * These numbers are the overall progress based on the segment sizes
+           * per stream. We assume a specific download order for the content
+           * based on the order of the streams and segments.
+           *
+           * Since we do not have per-stream bandwidth, the amount each
+           * influences the overall progress is based on the stream type,
+           * storage's default bandwidth assumptions, and the variant's
+           * bandwidth.
+           *
+           * In this example we see a larger difference between the audio and
+           * video contributions to progress.
+           *
+           * @type {!Array.<number>}
+           */
+          const progressSteps = [
+            0.241, 0.250, 0.491, 0.500, 0.741, 0.750, 0.991, 1.000,
+          ];
+          const manifest = makeWithVariantBandwidth();
+          await runProgressTest(manifest, progressSteps);
+       }));
+
+    /**
+     * Download |manifest| and make sure that the reported progress matches
+     * |expectedProgressSteps|.
+     *
+     * @param {shaka.extern.Manifest} manifest
+     * @param {!Array.<number>} expectedProgressSteps
+     */
+    async function runProgressTest(manifest, expectedProgressSteps) {
+      /**
+       * Create a copy of the array so that we are not modifying the original
+       * while we are tracking progress.
+       *
+       * @type {!Array.<number>}
+       */
+      const remainingProgress = expectedProgressSteps.slice();
+
+      const progressCallback = (content, progress) => {
+        expect(progress).toBeCloseTo(remainingProgress.shift());
+      };
+
+      storage.configure({
+        offline: {
+          progressCallback: progressCallback,
+        },
+      });
+
+      // Store a manifest with bandwidth only for the variant (no per
+      // stream bandwidth). This should result in a less accurate
+      // progression of progress values as default values will be used.
+      await storage.store(
+          'uri-wont-matter',
+          noMetadata, () => new shaka.test.FakeManifestParser(manifest));
+
+      // We should have hit all the progress steps.
+      expect(remainingProgress.length).toBe(0);
+    }
+
+    /**
+     * Build a custom manifest for testing progress. Each segment will be
+     * unique so that there will only be one request per segment uri (we
+     * often reuse segments in our tests).
+     *
+     * This manifest will have the variant-level bandwidth value and per-stream
+     * bandwidth values.
+     *
+     * @return {shaka.extern.Manifest}
+     */
+    function makeWithStreamBandwidth() {
+      const SegmentReference = shaka.media.SegmentReference;
+
+      const manifest = new shaka.test.ManifestGenerator()
+          .setPresentationDuration(20)
+          .addPeriod(0)
+              .addVariant(0).language(englishUS).bandwidth(13 * kbps)
+                  .addVideo(1).size(100, 200).bandwidth(10 * kbps)
+                  .addAudio(2).language(englishUS).bandwidth(3 * kbps)
+          .build();
+
+      const audio = manifest.periods[0].variants[0].audio;
+      goog.asserts.assert(audio, 'Created manifest with audio, where is it?');
+      overrideSegmentIndex(audio, [
+        new SegmentReference(0, 0, 1, uris(audioSegment1Uri), 0, null),
+        new SegmentReference(1, 1, 2, uris(audioSegment2Uri), 0, null),
+        new SegmentReference(2, 2, 3, uris(audioSegment3Uri), 0, null),
+        new SegmentReference(3, 3, 4, uris(audioSegment4Uri), 0, null),
+      ]);
+
+      const video = manifest.periods[0].variants[0].video;
+      goog.asserts.assert(video, 'Created manifest with video, where is it?');
+      overrideSegmentIndex(video, [
+        new SegmentReference(0, 0, 1, uris(videoSegment1Uri), 0, null),
+        new SegmentReference(1, 1, 2, uris(videoSegment2Uri), 0, null),
+        new SegmentReference(2, 2, 3, uris(videoSegment3Uri), 0, null),
+        new SegmentReference(3, 3, 4, uris(videoSegment4Uri), 0, null),
+      ]);
+
+      return manifest;
+    }
+
+    /**
+     * Build a custom manifest for testing progress. Each segment will be
+     * unique so that there will only be one request per segment uri (we
+     * often reuse segments in our tests).
+     *
+     * This manifest will only have the variant-level bandwidth value.
+     *
+     * @return {shaka.extern.Manifest}
+     */
+    function makeWithVariantBandwidth() {
+      // Start with the manifest that had per-stream bandwidths. Then remove
+      // the per-stream values.
+      const manifest = makeWithStreamBandwidth();
+      goog.asserts.assert(
+          manifest.periods.length == 1,
+          'Expecting manifest to only have one period');
+      goog.asserts.assert(
+          manifest.periods[0].variants.length == 1,
+          'Expecting manifest to only have one variant');
+
+      const variant = manifest.periods[0].variants[0];
+      goog.asserts.assert(
+          variant.audio,
+          'Expecting manifest to have audio stream');
+      goog.asserts.assert(
+          variant.video,
+          'Expecting manigest to have video stream');
+
+      // Remove the per stream bandwidth information.
+      variant.audio.bandwidth = undefined;
+      variant.video.bandwidth = undefined;
+
+      return manifest;
+    }
+  });
+
   describe('basic function', function() {
     /**
      * Keep a reference to the networking engine so that we can interrupt
@@ -391,7 +663,7 @@ describe('Storage', function() {
       // Use a real Player since Storage only uses the configuration and
       // networking engine.  This allows us to use Player.configure in these
       // tests.
-      player = new shaka.Player(new shaka.test.FakeVideo(), function(player) {
+      player = new shaka.Player(null, function(player) {
         player.createNetworkingEngine = () => netEngine;
       });
 
@@ -403,102 +675,13 @@ describe('Storage', function() {
       await player.destroy();
     });
 
-    describe('reports progress on store', function() {
-      it('uses stream bandwidth', checkAndRun(async function() {
-        // Change storage to only store one track so that it will be easy
-        // for use to ensure that only the one track was stored.
-        let selectTrack = (tracks) => {
-          let selected = tracks.filter((t) => t.language == frenchCanadian);
-          expect(selected.length).toBe(1);
-          return selected;
-        };
-
-        /**
-         * These numbers are the overall progress based on the segment sizes
-         * per stream. We assume a specific download order for the content
-         * based on the order of the streams and segments.
-         *
-         * Since the audio stream has smaller segments, its contribution to
-         * the overall progress is much smaller than the video stream segments.
-         *
-         * @type {!Array.<number>}
-         */
-        let progressSteps = [
-          0.19, 0.25, 0.44, 0.5, 0.69, 0.75, 0.94, 1.0
-        ];
-
-        let progressCallback = (content, progress) => {
-          expect(progress).toBeCloseTo(progressSteps.shift());
-        };
-
-        storage.configure({
-          trackSelectionCallback: selectTrack,
-          progressCallback: progressCallback
-        });
-
-        // Store a manifest with per stream bandwidth. This should result with
-        // a more accurate progression of progress values.
-        await storage.store(
-            manifestWithPerStreamBandwidthUri, noMetadata, FakeManifestParser);
-        expect(progressSteps.length).toBe(0);
-      }));
-
-      it('uses variant bandwidth when stream bandwidth is unavailable',
-          checkAndRun(async function() {
-            // Change storage to only store one track so that it will be easy
-            // for use to ensure that only the one track was stored.
-            let selectTrack = (tracks) => {
-              let selected = tracks.filter((t) => t.language == frenchCanadian);
-              expect(selected.length).toBe(1);
-              return selected;
-            };
-
-            /**
-             * These numbers are the overall progress based on the segment sizes
-             * per stream. We assume a specific download order for the content
-             * based on the order of the streams and segments.
-             *
-             * Since we do not have per-stream bandwidth, the amount each
-             * influences the overall progress is based on the stream type,
-             * storage's default bandwidth assumptions, and the variant's
-             * bandwidth.
-             *
-             * In this example we see a larger difference between the audio and
-             * video contributions to progress.
-             *
-             * @type {!Array.<number>}
-             */
-            let progressSteps = [
-              0.01, 0.25, 0.26, 0.5, 0.51, 0.75, 0.76, 1.0
-            ];
-
-            let progressCallback = (content, progress) => {
-              expect(progress).toBeCloseTo(progressSteps.shift());
-            };
-
-            storage.configure({
-              trackSelectionCallback: selectTrack,
-              progressCallback: progressCallback
-            });
-
-            // Store a manifest with bandwidth only for the variant (no per
-            // stream bandwidth). This should result in a less accurate
-            // progression of progress values as default values will be used.
-            await storage.store(
-                manifestWithoutPerStreamBandwidthUri,
-                noMetadata,
-                FakeManifestParser);
-            expect(progressSteps.length).toBe(0);
-         }));
-    });
-
     it('stores and lists content', checkAndRun(async function() {
       // Just use any three manifests as we don't care about the manifests
       // right now.
       const manifestUris = [
         manifestWithPerStreamBandwidthUri,
         manifestWithoutPerStreamBandwidthUri,
-        manifestWithNonZeroStartUri
+        manifestWithNonZeroStartUri,
       ];
 
       // TODO(vaage): This can be changed to use Array.map once storage is
@@ -528,7 +711,9 @@ describe('Storage', function() {
         return selected;
       };
       storage.configure({
-        trackSelectionCallback: selectTrack
+        offline: {
+          trackSelectionCallback: selectTrack,
+        },
       });
 
       // Stored content should reflect the tracks in the first period, so we
@@ -547,8 +732,9 @@ describe('Storage', function() {
       expect(uri).toBeTruthy();
 
       /** @type {!shaka.offline.StorageMuxer} */
-      let muxer = new shaka.offline.StorageMuxer();
-      await shaka.util.IDestroyable.with([muxer], async () => {
+      const muxer = new shaka.offline.StorageMuxer();
+
+      try {
         await muxer.init();
         let cell = await muxer.getCell(uri.mechanism(), uri.cell());
         let manifests = await cell.getManifests([uri.key()]);
@@ -569,7 +755,9 @@ describe('Storage', function() {
         let audio = period.streams.filter((s) => s.contentType == 'audio')[0];
         expect(audio).toBeTruthy();
         expect(audio.language).toBe(frenchCanadian);
-      });
+      } finally {
+        await muxer.destroy();
+      }
     }));
 
     it('stores drm info without license', checkAndRun(async function() {
@@ -597,8 +785,9 @@ describe('Storage', function() {
       expect(uri).toBeTruthy();
 
       /** @type {!shaka.offline.StorageMuxer} */
-      let muxer = new shaka.offline.StorageMuxer();
-      await shaka.util.IDestroyable.with([muxer], async () => {
+      const muxer = new shaka.offline.StorageMuxer();
+
+      try {
         await muxer.init();
         let cell = await muxer.getCell(uri.mechanism(), uri.cell());
         let manifests = await cell.getManifests([uri.key()]);
@@ -613,7 +802,9 @@ describe('Storage', function() {
         expect(manifest.sessionIds.length).toBe(2);
         expect(manifest.sessionIds).toContain(session1);
         expect(manifest.sessionIds).toContain(session2);
-      });
+      } finally {
+        await muxer.destroy();
+      }
     }));
 
     // Make sure that when we configure storage to NOT store persistent
@@ -634,7 +825,9 @@ describe('Storage', function() {
               storage,
               drm,
               makeManifestWithPerStreamBandwidth());
-          storage.configure({usePersistentLicense: false});
+          storage.configure({
+            usePersistentLicense: false,
+          });
 
           let stored = await storage.store(manifestWithPerStreamBandwidthUri);
 
@@ -643,8 +836,9 @@ describe('Storage', function() {
           expect(uri).toBeTruthy();
 
           /** @type {!shaka.offline.StorageMuxer} */
-          let muxer = new shaka.offline.StorageMuxer();
-          await shaka.util.IDestroyable.with([muxer], async () => {
+          const muxer = new shaka.offline.StorageMuxer();
+
+          try {
             await muxer.init();
             let cell = await muxer.getCell(uri.mechanism(), uri.cell());
             let manifests = await cell.getManifests([uri.key()]);
@@ -658,7 +852,9 @@ describe('Storage', function() {
 
             expect(manifest.sessionIds).toBeTruthy();
             expect(manifest.sessionIds.length).toBe(0);
-          });
+          } finally {
+            await muxer.destroy();
+          }
         }));
 
     // TODO(vaage): Remove the need to limit the number of store commands. With
@@ -703,42 +899,32 @@ describe('Storage', function() {
           }
         }));
 
-    it('throws an error if DRM sessions are not ready',
-        checkAndRun(async function() {
-          const drmInfo = makeDrmInfo();
-          const noSessions = [];
+    it('throws an error if destroyed mid-store', checkAndRun(async () => {
+      const manifest = makeManifestWithPerStreamBandwidth();
 
-          // TODO(vaage): Is there a way we can set the session ids without
-          //              needing to overload an internal call in storage.
-          let drm = new shaka.test.FakeDrmEngine();
-          drm.setDrmInfo(drmInfo);
-          drm.setSessionIds(noSessions);
+      /**
+       * Block storage when it goes to parse the manifest. Since we don't want
+       * to change the flow, return a valid manifest once it resolves.
+       * @type {shaka.util.PublicPromise}
+       */
+      const stallStorage = new shaka.util.PublicPromise();
+      storage.parseManifest = async () => {
+        await stallStorage;
+        return manifest;
+      };
 
-          overrideDrmAndManifest(
-              storage,
-              drm,
-              makeManifestWithPerStreamBandwidth());
+      // The uri won't matter as we have override |parseManifest|.
+      const waitOnStore = storage.store('uri-does-not-matter');
 
-          try {
-            await storage.store(manifestWithPerStreamBandwidthUri);
-            fail();
-          } catch (e) {
-            expect(e.code).toBe(shaka.util.Error.Code.NO_INIT_DATA_FOR_OFFLINE);
-          }
-        }));
+      // Request for storage to be destroyed. Before waiting for it to resolve,
+      // resolve the promise that we are using to stall the store operation.
+      const waitOnDestroy = storage.destroy();
+      stallStorage.resolve();
+      await waitOnDestroy;
 
-    it('throws an error if destroyed mid-store', checkAndRun(async function() {
-      // Block the network so that we won't finish the store command.
-      netEngine.delayNextRequest();
-      let storePromise = storage.store(
-          manifestWithPerStreamBandwidthUri, noMetadata, FakeManifestParser);
-
-      // Destroy storage. This should cause the store command to reject the
-      // promise.
-      await storage.destroy();
-
+      // The store request should not resolve, but instead be rejected.
       try {
-        await storePromise;
+        await waitOnStore;
         fail();
       } catch (e) {
         expect(e.code).toBe(shaka.util.Error.Code.OPERATION_ABORTED);
@@ -813,8 +999,9 @@ describe('Storage', function() {
       expect(uri).toBeTruthy();
 
       /** @type {!shaka.offline.StorageMuxer} */
-      let muxer = new shaka.offline.StorageMuxer();
-      await shaka.util.IDestroyable.with([muxer], async () => {
+      const muxer = new shaka.offline.StorageMuxer();
+
+      try {
         await muxer.init();
         let cell = await muxer.getCell(uri.mechanism(), uri.cell());
         let manifests = await cell.getManifests([uri.key()]);
@@ -833,7 +1020,9 @@ describe('Storage', function() {
 
         const noop = () => {};
         await cell.removeSegments(keys, noop);
-      });
+      } finally {
+        await muxer.destroy();
+      }
 
       await storage.remove(uri.toString());
     }));
@@ -857,7 +1046,11 @@ describe('Storage', function() {
 
       // Store a manifest with one track. We are using only one track so that it
       // will be easier to understand the progress values.
-      storage.configure({trackSelectionCallback: selectOneTrack});
+      storage.configure({
+        offline: {
+          trackSelectionCallback: selectOneTrack,
+        },
+      });
       let content = await storage.store(
           manifestWithPerStreamBandwidthUri,
           noMetadata,
@@ -867,7 +1060,7 @@ describe('Storage', function() {
        * @type {!Array.<number>}
        */
       let progressSteps = [
-        0.111, 0.222, 0.333, 0.444, 0.555, 0.666, 0.777, 0.888, 1.0
+        0.111, 0.222, 0.333, 0.444, 0.555, 0.666, 0.777, 0.888, 1.0,
       ];
 
       let progressCallback = (content, progress) => {
@@ -875,7 +1068,9 @@ describe('Storage', function() {
       };
 
       storage.configure({
-        progressCallback: progressCallback
+        offline: {
+          progressCallback: progressCallback,
+        },
       });
 
       await storage.remove(content.offlineUri);
@@ -884,14 +1079,31 @@ describe('Storage', function() {
     }));
   });
 
+  describe('storage without player', function() {
+    const TestManifestParser = shaka.test.TestScheme.ManifestParser;
+    const manifestUri = 'test:sintel';
+
+    it('stores content', checkAndRun(async function() {
+      /** @type {shaka.offline.Storage} */
+      const storage = new shaka.offline.Storage();
+      try {
+        await storage.store(manifestUri, noMetadata, TestManifestParser);
+      } finally {
+        await storage.destroy();
+      }
+    }));
+  });
+
   /**
    * @param {number} id
    * @param {number} height
    * @param {string} language
    * @param {number} bandwidth
-   * @return {shakaExtern.Track}
+   * @return {shaka.extern.Track}
    */
   function variantTrack(id, height, language, bandwidth) {
+    const videoId = id * 2;
+    const audioId = id * 2 + 1;
     return {
       id: id,
       active: false,
@@ -909,18 +1121,22 @@ describe('Storage', function() {
       videoCodec: 'mp4',
       primary: false,
       roles: [],
-      videoId: id * 2,
-      audioId: id * 2 + 1,
+      audioRoles: [],
+      videoId: videoId,
+      audioId: audioId,
       channelsCount: 2,
       audioBandwidth: bandwidth * 0.33,
-      videoBandwidth: bandwidth * 0.67
+      videoBandwidth: bandwidth * 0.67,
+      originalVideoId: videoId.toString(),
+      originalAudioId: audioId.toString(),
+      originalTextId: null,
     };
   }
 
   /**
    * @param {number} id
    * @param {string} language
-   * @return {shakaExtern.Track}
+   * @return {shaka.extern.Track}
    */
   function textTrack(id, language) {
     return {
@@ -940,11 +1156,15 @@ describe('Storage', function() {
       videoCodec: null,
       primary: false,
       roles: [],
+      audioRoles: null,
       videoId: null,
       audioId: null,
       channelsCount: null,
       audioBandwidth: null,
-      videoBandwidth: null
+      videoBandwidth: null,
+      originalVideoId: null,
+      originalAudioId: null,
+      originalTextId: id.toString(),
     };
   }
 
@@ -957,7 +1177,7 @@ describe('Storage', function() {
   }
 
   /**
-   * @return {shakaExtern.Manifest}
+   * @return {shaka.extern.Manifest}
    */
   function makeManifestWithPerStreamBandwidth() {
     const SegmentReference = shaka.media.SegmentReference;
@@ -980,7 +1200,7 @@ describe('Storage', function() {
         new SegmentReference(0, 0, 1, uris(segment1Uri), 0, null),
         new SegmentReference(1, 1, 2, uris(segment2Uri), 0, null),
         new SegmentReference(2, 2, 3, uris(segment3Uri), 0, null),
-        new SegmentReference(3, 3, 4, uris(segment4Uri), 0, null)
+        new SegmentReference(3, 3, 4, uris(segment4Uri), 0, null),
       ];
 
       overrideSegmentIndex(stream, refs);
@@ -990,7 +1210,7 @@ describe('Storage', function() {
   }
 
   /**
-   * @return {shakaExtern.Manifest}
+   * @return {shaka.extern.Manifest}
    */
   function makeManifestWithoutPerStreamBandwidth() {
     let manifest = makeManifestWithPerStreamBandwidth();
@@ -1004,7 +1224,7 @@ describe('Storage', function() {
   }
 
   /**
-   * @return {shakaExtern.Manifest}
+   * @return {shaka.extern.Manifest}
    */
   function makeManifestWithNonZeroStart() {
     const SegmentReference = shaka.media.SegmentReference;
@@ -1016,7 +1236,7 @@ describe('Storage', function() {
         new SegmentReference(0, 10, 11, uris(segment1Uri), 0, null),
         new SegmentReference(1, 11, 12, uris(segment2Uri), 0, null),
         new SegmentReference(2, 12, 13, uris(segment3Uri), 0, null),
-        new SegmentReference(3, 13, 14, uris(segment4Uri), 0, null)
+        new SegmentReference(3, 13, 14, uris(segment4Uri), 0, null),
       ];
 
       overrideSegmentIndex(stream, refs);
@@ -1026,7 +1246,7 @@ describe('Storage', function() {
   }
 
   /**
-   * @return {shakaExtern.Manifest}
+   * @return {shaka.extern.Manifest}
    */
   function makeManifestWithLiveTimeline() {
     let manifest = makeManifestWithPerStreamBandwidth();
@@ -1036,8 +1256,8 @@ describe('Storage', function() {
   }
 
   /**
-   * @param {shakaExtern.Manifest} manifest
-   * @return {!Array.<shakaExtern.Stream>}
+   * @param {shaka.extern.Manifest} manifest
+   * @return {!Array.<shaka.extern.Stream>}
    */
   function getAllStreams(manifest) {
     let streams = [];
@@ -1056,7 +1276,7 @@ describe('Storage', function() {
   }
 
   /**
-   * @param {shakaExtern.Stream} stream
+   * @param {shaka.extern.Stream} stream
    * @param {!Array.<shaka.media.SegmentReference>} segments
    */
   function overrideSegmentIndex(stream, segments) {
@@ -1067,47 +1287,36 @@ describe('Storage', function() {
 
   /** @return {!shaka.test.FakeNetworkingEngine} */
   function makeNetworkEngine() {
-    let map = {};
-    map[segment1Uri] = new ArrayBuffer(16);
-    map[segment2Uri] = new ArrayBuffer(16);
-    map[segment3Uri] = new ArrayBuffer(16);
-    map[segment4Uri] = new ArrayBuffer(16);
-
-    let net = new shaka.test.FakeNetworkingEngine();
-    net.setResponseMap(map);
-    return net;
+    return new shaka.test.FakeNetworkingEngine()
+        .setResponseValue(segment1Uri, new ArrayBuffer(16))
+        .setResponseValue(segment2Uri, new ArrayBuffer(16))
+        .setResponseValue(segment3Uri, new ArrayBuffer(16))
+        .setResponseValue(segment4Uri, new ArrayBuffer(16));
   }
 
-  function eraseStorage() {
-    let muxer = new shaka.offline.StorageMuxer();
-    return shaka.util.IDestroyable.with([muxer], async () => {
-      await muxer.init();
+  async function eraseStorage() {
+    /** @type {!shaka.offline.StorageMuxer} */
+    const muxer = new shaka.offline.StorageMuxer();
+
+    try {
       await muxer.erase();
-    });
+    } finally {
+      await muxer.destroy();
+    }
   }
 
   /**
    * @param {!shaka.offline.Storage} storage
    * @param {!shaka.media.DrmEngine} drm
-   * @param {shakaExtern.Manifest} manifest
+   * @param {shaka.extern.Manifest} manifest
    */
   function overrideDrmAndManifest(storage, drm, manifest) {
-    /**
-     * @type {{
-     *  drmEngine: !shaka.media.DrmEngine,
-     *  manifest: shakaExtern.Manifest
-     *  }}
-     */
-    let ret = {
-      drmEngine: drm,
-      manifest: manifest
-    };
-
-    storage.loadInternal = () => Promise.resolve(ret);
+    storage.parseManifest = () => Promise.resolve(manifest);
+    storage.createDrmEngine = () => Promise.resolve(drm);
   }
 
   /**
-   * @return {shakaExtern.DrmInfo}
+   * @return {shaka.extern.DrmInfo}
    */
   function makeDrmInfo() {
     let drmInfo = {
@@ -1119,13 +1328,14 @@ describe('Storage', function() {
       keyIds: null,
       serverCertificate: null,
       audioRobustness: 'HARDY',
-      videoRobustness: 'OTHER'
+      videoRobustness: 'OTHER',
     };
 
     return drmInfo;
   }
 
-  /** @implements {shakaExtern.ManifestParser} */
+  // TODO(vaage): Replace this with |shaka.test.FakeManifestParser|
+  /** @implements {shaka.extern.ManifestParser} */
   let FakeManifestParser = class {
     constructor() {
       this.map_ = {};
@@ -1172,62 +1382,62 @@ describe('Storage', function() {
 
   /**
    * @param {!shaka.offline.OfflineUri} uri
-   * @return {!Promise.<shakaExtern.Manifest>}
+   * @return {!Promise.<shaka.extern.Manifest>}
    */
   async function getStoredManifest(uri) {
-    /** @type {!shaka.offline.StorageMuxer} */
-    let muxer = new shaka.offline.StorageMuxer();
-    let manifestDB = await shaka.util.IDestroyable.with([muxer], async () => {
-      await muxer.init();
-      let cell = await muxer.getCell(uri.mechanism(), uri.cell());
-      let manifests = await cell.getManifests([uri.key()]);
-      let manifest = manifests[0];
-
-      return manifest;
-    });
-
-    goog.asserts.assert(manifestDB, 'A manifest should have been found');
-
-    let converter = new shaka.offline.ManifestConverter(
+    /** @type {!shaka.offline.ManifestConverter} */
+    const converter = new shaka.offline.ManifestConverter(
         uri.mechanism(), uri.cell());
 
-    return converter.fromManifestDB(manifestDB);
+    /** @type {!shaka.offline.StorageMuxer} */
+    const muxer = new shaka.offline.StorageMuxer();
+
+    try {
+      await muxer.init();
+      const cell = await muxer.getCell(uri.mechanism(), uri.cell());
+      const manifests = await cell.getManifests([uri.key()]);
+      const manifest = manifests[0];
+
+      goog.asserts.assert(manifest, 'A manifest should have been found');
+      return converter.fromManifestDB(manifest);
+    } finally {
+      await muxer.destroy();
+    }
   }
 
   /**
    * @param {!shaka.Player} player
-   * @param {shakaExtern.Manifest} manifest
+   * @param {shaka.extern.Manifest} manifest
    * @param {function(!shaka.media.DrmEngine):Promise} action
    * @return {!Promise}
    */
-  function withDrm(player, manifest, action) {
-    const offlineLicense = true;
-
-    let net = player.getNetworkingEngine();
+  async function withDrm(player, manifest, action) {
+    const net = player.getNetworkingEngine();
     goog.asserts.assert(net, 'Player should have a net engine right now');
 
     let error = null;
 
-    let drm = new shaka.media.DrmEngine({
+    /** @type {!shaka.media.DrmEngine} */
+    const drm = new shaka.media.DrmEngine({
       netEngine: net,
       onError: (e) => { error = error || e; },
       onKeyStatus: () => {},
       onExpirationUpdated: () => {},
-      onEvent: () => {}
+      onEvent: () => {},
     });
 
-    return shaka.util.IDestroyable.with([drm], async () => {
+    try {
       drm.configure(player.getConfiguration().drm);
-      await drm.init(manifest, offlineLicense);
+      const variants = shaka.util.Periods.getAllVariantsFrom(manifest.periods);
+      await drm.initForStorage(variants, /* usePersistentLicenses */ true);
+      await action(drm);
+    } finally {
+      await drm.destroy();
+    }
 
-      return action(drm);
-    }).then((result) => {
-      if (error) {
-        throw error;
-      }
-
-      return result;
-    });
+    if (error) {
+      throw error;
+    }
   }
 
   /**

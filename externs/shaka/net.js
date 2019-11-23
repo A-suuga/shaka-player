@@ -16,7 +16,9 @@
  */
 
 
-/** @externs */
+/**
+ * @externs
+ */
 
 
 /**
@@ -47,7 +49,7 @@
  *
  * @exportDoc
  */
-shakaExtern.RetryParameters;
+shaka.extern.RetryParameters;
 
 
 /**
@@ -57,7 +59,9 @@ shakaExtern.RetryParameters;
  *   body: ArrayBuffer,
  *   headers: !Object.<string, string>,
  *   allowCrossSiteCredentials: boolean,
- *   retryParameters: !shakaExtern.RetryParameters
+ *   retryParameters: !shaka.extern.RetryParameters,
+ *   licenseRequestType: ?string,
+ *   sessionId: ?string
  * }}
  *
  * @description
@@ -76,13 +80,21 @@ shakaExtern.RetryParameters;
  *   A mapping of headers for the request.  e.g.: {'HEADER': 'VALUE'}
  * @property {boolean} allowCrossSiteCredentials
  *   Make requests with credentials.  This will allow cookies in cross-site
- *   requests.  See <a href="http://goo.gl/YBRKPe">http://goo.gl/YBRKPe</a>.
- * @property {!shakaExtern.RetryParameters} retryParameters
+ *   requests.  See {@link https://bit.ly/CorsCred}.
+ * @property {!shaka.extern.RetryParameters} retryParameters
  *   An object used to define how often to make retries.
+ * @property {?string} licenseRequestType
+ *   If this is a LICENSE request, this field contains the type of license
+ *   request it is (not the type of license).  This is the |messageType| field
+ *   of the EME message.  For example, this could be 'license-request' or
+ *   'license-renewal'.
+ * @property {?string} sessionId
+ *   If this is a LICENSE request, this field contains the session ID of the
+ *   EME session that made the request.
  *
  * @exportDoc
  */
-shakaExtern.Request;
+shaka.extern.Request;
 
 
 /**
@@ -102,6 +114,9 @@ shakaExtern.Request;
  * @property {string} uri
  *   The URI which was loaded.  Request filters and server redirects can cause
  *   this to be different from the original request URIs.
+ * @property {string} originalUri
+ *   The original URI passed to the browser for networking. This is before any
+ *   redirects, but after request filters are executed.
  * @property {ArrayBuffer} data
  *   The body of the response.
  * @property {!Object.<string, string>} headers
@@ -117,19 +132,43 @@ shakaExtern.Request;
  *
  * @exportDoc
  */
-shakaExtern.Response;
+shaka.extern.Response;
 
 
 /**
+ * @typedef {!function(string,
+ *                     shaka.extern.Request,
+ *                     shaka.net.NetworkingEngine.RequestType,
+ *                     shaka.extern.ProgressUpdated):
+ *     !shaka.extern.IAbortableOperation.<shaka.extern.Response>}
+ * @description
  * Defines a plugin that handles a specific scheme.
  *
- * @typedef {!function(string,
- *                     shakaExtern.Request,
- *                     shaka.net.NetworkingEngine.RequestType):
- *     !shakaExtern.IAbortableOperation.<shakaExtern.Response>}
+ * The functions accepts four parameters, uri string, request, request type,
+ * and a progressUpdated function.  The progressUpdated function can be ignored
+ * by plugins that do not have this information, but it will always be provided
+ * by NetworkingEngine.
+ *
  * @exportDoc
  */
-shakaExtern.SchemePlugin;
+shaka.extern.SchemePlugin;
+
+
+/**
+ * @typedef {function(number, number, number)}
+ *
+ * @description
+ * A callback function to handle progress event through networking engine in
+ * player.
+ * The first argument is a number for duration in milliseconds, that the request
+ * took to complete.
+ * The second argument is the total number of bytes downloaded during that
+ * time.
+ * The third argument is the number of bytes remaining to be loaded in a
+ * segment.
+ * @exportDoc
+ */
+shaka.extern.ProgressUpdated;
 
 
 /**
@@ -139,11 +178,11 @@ shakaExtern.SchemePlugin;
  * the request will not be sent until the promise is resolved.
  *
  * @typedef {!function(shaka.net.NetworkingEngine.RequestType,
- *                     shakaExtern.Request):
+ *                     shaka.extern.Request):
              (Promise|undefined)}
  * @exportDoc
  */
-shakaExtern.RequestFilter;
+shaka.extern.RequestFilter;
 
 
 /**
@@ -152,8 +191,8 @@ shakaExtern.RequestFilter;
  * A response filter can run asynchronously by returning a promise.
  *
  * @typedef {!function(shaka.net.NetworkingEngine.RequestType,
- *                     shakaExtern.Response):
+ *                     shaka.extern.Response):
               (Promise|undefined)}
  * @exportDoc
  */
-shakaExtern.ResponseFilter;
+shaka.extern.ResponseFilter;

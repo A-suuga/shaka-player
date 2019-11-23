@@ -56,17 +56,17 @@ describe('SimpleTextDisplayer', function() {
 
   describe('append', function() {
     it('sorts cues before inserting', function() {
-      // See: https://goo.gl/BirBy9
+      // See: https://bit.ly/2K9VX3s
       verifyHelper(
           [
             {start: 10, end: 20, text: 'Test1'},
             {start: 20, end: 30, text: 'Test2'},
-            {start: 30, end: 40, text: 'Test3'}
+            {start: 30, end: 40, text: 'Test3'},
           ],
           [
             new shaka.text.Cue(20, 30, 'Test2'),
             new shaka.text.Cue(30, 40, 'Test3'),
-            new shaka.text.Cue(10, 20, 'Test1')
+            new shaka.text.Cue(10, 20, 'Test1'),
           ]);
     });
 
@@ -76,12 +76,12 @@ describe('SimpleTextDisplayer', function() {
           [
             {start: 20, end: 40, text: 'Test1'},
             {start: 20, end: 40, text: 'Test2'},
-            {start: 20, end: 40, text: 'Test3'}
+            {start: 20, end: 40, text: 'Test3'},
           ],
           [
             new shaka.text.Cue(20, 40, 'Test3'),
             new shaka.text.Cue(20, 40, 'Test2'),
-            new shaka.text.Cue(20, 40, 'Test1')
+            new shaka.text.Cue(20, 40, 'Test1'),
           ]);
     });
   });
@@ -126,10 +126,10 @@ describe('SimpleTextDisplayer', function() {
     it('converts shaka.text.Cues to VttCues', function() {
       verifyHelper(
           [
-            {start: 20, end: 40, text: 'Test'}
+            {start: 20, end: 40, text: 'Test'},
           ],
           [
-            new shaka.text.Cue(20, 40, 'Test')
+            new shaka.text.Cue(20, 40, 'Test'),
           ]);
 
       let cue1 = new shaka.text.Cue(20, 40, 'Test');
@@ -137,7 +137,7 @@ describe('SimpleTextDisplayer', function() {
       cue1.lineAlign = Cue.lineAlign.START;
       cue1.size = 80;
       cue1.textAlign = Cue.textAlign.LEFT;
-      cue1.writingDirection = Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT;
+      cue1.writingMode = Cue.writingMode.VERTICAL_LEFT_TO_RIGHT;
       cue1.lineInterpretation = Cue.lineInterpretation.LINE_NUMBER;
       cue1.line = 5;
       cue1.position = 10;
@@ -155,15 +155,15 @@ describe('SimpleTextDisplayer', function() {
               vertical: 'lr',
               snapToLines: true,
               line: 5,
-              position: 10
-            }
+              position: 10,
+            },
           ], [cue1]);
 
       let cue2 = new shaka.text.Cue(30, 50, 'Test');
       cue2.positionAlign = Cue.positionAlign.RIGHT;
       cue2.lineAlign = Cue.lineAlign.END;
       cue2.textAlign = Cue.textAlign.RIGHT;
-      cue2.writingDirection = Cue.writingDirection.VERTICAL_RIGHT_TO_LEFT;
+      cue2.writingMode = Cue.writingMode.VERTICAL_RIGHT_TO_LEFT;
       cue2.lineInterpretation = Cue.lineInterpretation.PERCENTAGE;
       cue2.line = 5;
 
@@ -178,15 +178,15 @@ describe('SimpleTextDisplayer', function() {
               align: 'right',
               vertical: 'rl',
               snapToLines: false,
-              line: 5
-            }
+              line: 5,
+            },
           ], [cue2]);
 
       let cue3 = new shaka.text.Cue(40, 60, 'Test');
       cue3.positionAlign = Cue.positionAlign.CENTER;
       cue3.lineAlign = Cue.lineAlign.CENTER;
       cue3.textAlign = Cue.textAlign.START;
-      cue3.writingDirection = Cue.writingDirection.HORIZONTAL_LEFT_TO_RIGHT;
+      cue3.direction = Cue.direction.HORIZONTAL_LEFT_TO_RIGHT;
 
       verifyHelper(
           [
@@ -197,8 +197,8 @@ describe('SimpleTextDisplayer', function() {
               lineAlign: 'center',
               positionAlign: 'center',
               align: 'start',
-              vertical: undefined
-            }
+              vertical: undefined,
+            },
           ], [cue3]);
 
       let cue4 = new shaka.text.Cue(40, 60, 'Test');
@@ -214,8 +214,8 @@ describe('SimpleTextDisplayer', function() {
               // In a real VTTCue, these would be the default of "auto".
               // With our mock, we leave them unset and they are undefined.
               line: undefined,
-              position: undefined
-            }
+              position: undefined,
+            },
           ], [cue4]);
 
       let cue5 = new shaka.text.Cue(40, 60, 'Test');
@@ -229,8 +229,8 @@ describe('SimpleTextDisplayer', function() {
               end: 60,
               text: 'Test',
               line: 0,
-              position: 0
-            }
+              position: 0,
+            },
           ], [cue5]);
     });
 
@@ -247,7 +247,7 @@ describe('SimpleTextDisplayer', function() {
           get: function() { return align; },
           set: function(newValue) {
             if (newValue != 'center') align = newValue;
-          }
+          },
         });
         this.startTime = start;
         this.endTime = end;
@@ -264,8 +264,8 @@ describe('SimpleTextDisplayer', function() {
               start: 20,
               end: 40,
               text: 'Test',
-              align: 'middle'
-            }
+              align: 'middle',
+            },
           ],
           [cue1]);
     });

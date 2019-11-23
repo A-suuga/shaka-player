@@ -166,12 +166,12 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, 0),
-        createTimePoint(20, 10, 0)
+        createTimePoint(20, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 20},
-        {start: 20, end: 30}
+        {start: 20, end: 30},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -180,12 +180,12 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(null, 10, 0),
-        createTimePoint(null, 10, 0)
+        createTimePoint(null, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 20},
-        {start: 20, end: 30}
+        {start: 20, end: 30},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -193,11 +193,11 @@ describe('MpdUtils', function() {
     it('handles gaps', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
-        createTimePoint(15, 10, 0)
+        createTimePoint(15, 10, 0),
       ];
       let result = [
         {start: 0, end: 15},
-        {start: 15, end: 25}
+        {start: 15, end: 25},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -205,11 +205,11 @@ describe('MpdUtils', function() {
     it('handles overlap', function() {
       let timePoints = [
         createTimePoint(0, 15, 0),
-        createTimePoint(10, 10, 0)
+        createTimePoint(10, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
-        {start: 10, end: 20}
+        {start: 10, end: 20},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -217,7 +217,7 @@ describe('MpdUtils', function() {
     it('handles repetitions', function() {
       let timePoints = [
         createTimePoint(0, 10, 5),
-        createTimePoint(60, 10, 0)
+        createTimePoint(60, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
@@ -226,7 +226,7 @@ describe('MpdUtils', function() {
         {start: 30, end: 40},
         {start: 40, end: 50},
         {start: 50, end: 60},
-        {start: 60, end: 70}
+        {start: 60, end: 70},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -235,12 +235,12 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, null),
-        createTimePoint(20, 10, 0)
+        createTimePoint(20, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 20},
-        {start: 20, end: 30}
+        {start: 20, end: 30},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -248,13 +248,13 @@ describe('MpdUtils', function() {
     it('handles repetitions with gap', function() {
       let timePoints = [
         createTimePoint(0, 10, 2),
-        createTimePoint(35, 10, 0)
+        createTimePoint(35, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 20},
         {start: 20, end: 35},
-        {start: 35, end: 45}
+        {start: 35, end: 45},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -263,14 +263,14 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, -1),
-        createTimePoint(40, 10, 0)
+        createTimePoint(40, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 20},
         {start: 20, end: 30},
         {start: 30, end: 40},
-        {start: 40, end: 50}
+        {start: 40, end: 50},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -279,7 +279,7 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, -1),
-        createTimePoint(45, 5, 0)
+        createTimePoint(45, 5, 0),
       ];
       let result = [
         {start: 0, end: 10},
@@ -287,7 +287,7 @@ describe('MpdUtils', function() {
         {start: 20, end: 30},
         {start: 30, end: 40},
         {start: 40, end: 45},
-        {start: 45, end: 50}
+        {start: 45, end: 50},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -296,10 +296,10 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, -1),
-        createTimePoint(5, 10, 0)
+        createTimePoint(5, 10, 0),
       ];
       let result = [
-        {start: 0, end: 10}
+        {start: 0, end: 10},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -308,10 +308,10 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, -1),
-        createTimePoint(null, 10, 0)
+        createTimePoint(null, 10, 0),
       ];
       let result = [
-        {start: 0, end: 10}
+        {start: 0, end: 10},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -319,13 +319,13 @@ describe('MpdUtils', function() {
     it('handles negative repetitions at end', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
-        createTimePoint(10, 5, -1)
+        createTimePoint(10, 5, -1),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 15},
         {start: 15, end: 20},
-        {start: 20, end: 25}
+        {start: 20, end: 25},
       ];
       checkTimePoints(timePoints, result, 1, 0, 25);
     });
@@ -333,10 +333,10 @@ describe('MpdUtils', function() {
     it('handles negative repetitions at end w/o Period length', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
-        createTimePoint(10, 5, -1)
+        createTimePoint(10, 5, -1),
       ];
       let result = [
-        {start: 0, end: 10}
+        {start: 0, end: 10},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -345,11 +345,11 @@ describe('MpdUtils', function() {
       let timePoints = [
         createTimePoint(0, 10, 0),
         createTimePoint(10, 10, 0),
-        createTimePoint(25, 5, -1)
+        createTimePoint(25, 5, -1),
       ];
       let result = [
         {start: 0, end: 10},
-        {start: 10, end: 20}
+        {start: 10, end: 20},
       ];
       checkTimePoints(timePoints, result, 1, 0, 20);
     });
@@ -360,11 +360,11 @@ describe('MpdUtils', function() {
         createTimePoint(10, 10, 0),
         createTimePoint(20, null, 0),
         createTimePoint(30, 10, 0),
-        createTimePoint(40, 10, 0)
+        createTimePoint(40, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
-        {start: 10, end: 20}
+        {start: 10, end: 20},
       ];
       checkTimePoints(timePoints, result, 1, 0, Infinity);
     });
@@ -374,13 +374,13 @@ describe('MpdUtils', function() {
         createTimePoint(10, 10, 0),
         createTimePoint(20, 10, 0),
         createTimePoint(30, 10, 0),
-        createTimePoint(40, 10, 0)
+        createTimePoint(40, 10, 0),
       ];
       let result = [
         {start: 0, end: 10},
         {start: 10, end: 20},
         {start: 20, end: 30},
-        {start: 30, end: 40}
+        {start: 30, end: 40},
       ];
       checkTimePoints(timePoints, result, 1, 10, Infinity);
     });
@@ -442,7 +442,7 @@ describe('MpdUtils', function() {
 
     /** @type {!shaka.test.FakeNetworkingEngine} */
     let fakeNetEngine;
-    /** @type {shakaExtern.RetryParameters} */
+    /** @type {shaka.extern.RetryParameters} */
     let retry;
     /** @type {!DOMParser} */
     let parser;
@@ -456,18 +456,18 @@ describe('MpdUtils', function() {
       parser = new DOMParser();
     });
 
-    it('will replace elements and children', function(done) {
+    it('will replace elements and children', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />');
       let xlinkXMLString = '<ToReplace variable="1"><Contents /></ToReplace>';
       let desiredXMLString = inBaseContainer(
           '<ToReplace variable="1"><Contents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testSucceeds(baseXMLString, desiredXMLString, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testSucceeds(baseXMLString, desiredXMLString, 1);
     });
 
-    it('preserves non-xlink attributes', function(done) {
+    it('preserves non-xlink attributes', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace otherVariable="q" xlink:href="https://xlink1" ' +
           'xlink:actuate="onLoad" />');
@@ -475,11 +475,11 @@ describe('MpdUtils', function() {
       let desiredXMLString = inBaseContainer(
           '<ToReplace otherVariable="q" variable="1"><Contents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testSucceeds(baseXMLString, desiredXMLString, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testSucceeds(baseXMLString, desiredXMLString, 1);
     });
 
-    it('preserves text', function(done) {
+    it('preserves text', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />');
       let xlinkXMLString =
@@ -487,11 +487,11 @@ describe('MpdUtils', function() {
       let desiredXMLString = inBaseContainer(
           '<ToReplace variable="1">TEXT CONTAINED WITHIN</ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testSucceeds(baseXMLString, desiredXMLString, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testSucceeds(baseXMLString, desiredXMLString, 1);
     });
 
-    it('supports multiple replacements', function(done) {
+    it('supports multiple replacements', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />',
           '<ToReplace xlink:href="https://xlink2" xlink:actuate="onLoad" />');
@@ -504,14 +504,14 @@ describe('MpdUtils', function() {
           '<ToReplace otherVariable="blue" /></ToReplace>',
           '<ToReplace variable="2"><Contents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText({
-        'https://xlink1': xlinkXMLString1,
-        'https://xlink2': xlinkXMLString2,
-        'https://xlink3': xlinkXMLString3});
-      testSucceeds(baseXMLString, desiredXMLString, 3, done);
+      fakeNetEngine
+          .setResponseText('https://xlink1', xlinkXMLString1)
+          .setResponseText('https://xlink2', xlinkXMLString2)
+          .setResponseText('https://xlink3', xlinkXMLString3);
+      await testSucceeds(baseXMLString, desiredXMLString, 3);
     });
 
-    it('fails if loaded file is invalid xml', function(done) {
+    it('fails if loaded file is invalid xml', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />');
       // Note this does not have a close angle bracket.
@@ -520,29 +520,29 @@ describe('MpdUtils', function() {
           Error.Severity.CRITICAL, Error.Category.MANIFEST,
           Error.Code.DASH_INVALID_XML, 'https://xlink1');
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testFails(baseXMLString, expectedError, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testFails(baseXMLString, expectedError, 1);
     });
 
-    it('fails if it recurses too many times', function(done) {
+    it('fails if it recurses too many times', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />');
       // Create a large but finite number of links, so this won't
       // infinitely recurse if there isn't a depth limit.
-      let responseMap = {};
       for (let i = 1; i < 20; i++) {
-        responseMap['https://xlink' + i] =
-            makeRecursiveXMLString(0, 'https://xlink' + (i + 1) + '');
+        const key = 'https://xlink' + i;
+        const value = makeRecursiveXMLString(0, 'https://xlink' + (i + 1) + '');
+
+        fakeNetEngine.setResponseText(key, value);
       }
       let expectedError = new shaka.util.Error(
           Error.Severity.CRITICAL, Error.Category.MANIFEST,
           Error.Code.DASH_XLINK_DEPTH_LIMIT);
 
-      fakeNetEngine.setResponseMapAsText(responseMap);
-      testFails(baseXMLString, expectedError, 5, done);
+      await testFails(baseXMLString, expectedError, 5);
     });
 
-    it('preserves url parameters', function(done) {
+    it('preserves url parameters', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1?parameter" ' +
           'xlink:actuate="onLoad" />');
@@ -550,12 +550,12 @@ describe('MpdUtils', function() {
       let desiredXMLString = inBaseContainer(
           '<ToReplace variable="1"><Contents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText(
-          {'https://xlink1?parameter': xlinkXMLString});
-      testSucceeds(baseXMLString, desiredXMLString, 1, done);
+      fakeNetEngine.setResponseText(
+          'https://xlink1?parameter', xlinkXMLString);
+      await testSucceeds(baseXMLString, desiredXMLString, 1);
     });
 
-    it('replaces existing contents', function(done) {
+    it('replaces existing contents', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad">' +
           '<Unwanted /></ToReplace>');
@@ -563,11 +563,11 @@ describe('MpdUtils', function() {
       let desiredXMLString = inBaseContainer(
           '<ToReplace variable="1"><Contents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testSucceeds(baseXMLString, desiredXMLString, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testSucceeds(baseXMLString, desiredXMLString, 1);
     });
 
-    it('handles relative links', function(done) {
+    it('handles relative links', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="xlink1" xlink:actuate="onLoad" />',
           '<ToReplace xlink:href="xlink2" xlink:actuate="onLoad" />');
@@ -577,21 +577,21 @@ describe('MpdUtils', function() {
           '<ToReplace variable="2"><Contents /></ToReplace>';
       let xlinkXMLString3 = // This is loaded relative to string1.
           '<ToReplace variable="3" />';
-      let responseMap = {};
-      responseMap['https://base/xlink1'] = xlinkXMLString1;
-      responseMap['https://base/xlink2'] = xlinkXMLString2;
-      responseMap['https://base/xlink3'] = xlinkXMLString3;
+      fakeNetEngine
+          .setResponseText('https://base/xlink1', xlinkXMLString1)
+          .setResponseText('https://base/xlink2', xlinkXMLString2)
+          .setResponseText('https://base/xlink3', xlinkXMLString3);
+
       let desiredXMLString = inBaseContainer(
           '<ToReplace xmlns="urn:mpeg:dash:schema:mpd:2011" ' +
           'xmlns:xlink="http://www.w3.org/1999/xlink" variable="1">' +
           '<ToReplace variable="3" /></ToReplace>',
           '<ToReplace variable="2"><Contents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText(responseMap);
-      testSucceeds(baseXMLString, desiredXMLString, 3, done);
+      await testSucceeds(baseXMLString, desiredXMLString, 3);
     });
 
-    it('fails for actuate=onRequest', function(done) {
+    it('fails for actuate=onRequest', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" ' +
           'xlink:actuate="onRequest" />');
@@ -600,11 +600,11 @@ describe('MpdUtils', function() {
           Error.Severity.CRITICAL, Error.Category.MANIFEST,
           Error.Code.DASH_UNSUPPORTED_XLINK_ACTUATE);
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testFails(baseXMLString, expectedError, 0, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testFails(baseXMLString, expectedError, 0);
     });
 
-    it('fails for no actuate', function(done) {
+    it('fails for no actuate', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" />');
       let xlinkXMLString = '<ToReplace variable="1"><Contents /></ToReplace>';
@@ -612,28 +612,28 @@ describe('MpdUtils', function() {
           Error.Severity.CRITICAL, Error.Category.MANIFEST,
           Error.Code.DASH_UNSUPPORTED_XLINK_ACTUATE);
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testFails(baseXMLString, expectedError, 0, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testFails(baseXMLString, expectedError, 0);
     });
 
-    it('removes elements with resolve-to-zero', function(done) {
+    it('removes elements with resolve-to-zero', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="urn:mpeg:dash:resolve-to-zero:2013" />');
       let desiredXMLString = inBaseContainer();
 
-      testSucceeds(baseXMLString, desiredXMLString, 0, done);
+      await testSucceeds(baseXMLString, desiredXMLString, 0);
     });
 
-    it('needs the top-level to match the link\'s tagName', function(done) {
+    it('needs the top-level to match the link\'s tagName', async () => {
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />');
       let xlinkXMLString = '<BadTagName</BadTagName>';
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testFails(baseXMLString, null, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testFails(baseXMLString, null, 1);
     });
 
-    it('doesn\'t error when set to fail gracefully', function(done) {
+    it('doesn\'t error when set to fail gracefully', async () => {
       failGracefully = true;
       let baseXMLString = inBaseContainer(
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad">' +
@@ -643,8 +643,8 @@ describe('MpdUtils', function() {
       let desiredXMLString = inBaseContainer(
           '<ToReplace><DefaultContents /></ToReplace>');
 
-      fakeNetEngine.setResponseMapAsText({'https://xlink1': xlinkXMLString});
-      testSucceeds(baseXMLString, desiredXMLString, 1, done);
+      fakeNetEngine.setResponseText('https://xlink1', xlinkXMLString);
+      await testSucceeds(baseXMLString, desiredXMLString, 1);
     });
 
     it('interrupts requests on abort', function(done) {
@@ -652,12 +652,12 @@ describe('MpdUtils', function() {
           '<ToReplace xlink:href="https://xlink1" xlink:actuate="onLoad" />');
       // Create a few links.  This is few enough that it would succeed if we
       // didn't abort it.
-      let responseMap = {};
       for (let i = 1; i < 3; i++) {
-        responseMap['https://xlink' + i] =
-            makeRecursiveXMLString(0, 'https://xlink' + (i + 1) + '');
+        const key = 'https://xlink' + i;
+        const value = makeRecursiveXMLString(0, 'https://xlink' + (i + 1) + '');
+
+        fakeNetEngine.setResponseText(key, value);
       }
-      fakeNetEngine.setResponseMapAsText(responseMap);
       let continuePromise = fakeNetEngine.delayNextRequest();
 
       let xml = parser.parseFromString(baseXMLString, 'text/xml')
@@ -688,34 +688,32 @@ describe('MpdUtils', function() {
       operation.finally(done);
     });
 
-    it('ignores SegmentTimeline children', (done) => {
+    it('ignores SegmentTimeline children', async () => {
       let baseXMLString = inBaseContainer(
           '<SegmentTimeline>' +
           '  <ToReplace xlink:href="https://xlink1" ' +
           '     xlink:actuate="onRequest" />' +
           '</SegmentTimeline>');
-      testSucceeds(baseXMLString, baseXMLString, 0, done);
+      await testSucceeds(baseXMLString, baseXMLString, 0);
     });
 
-    function testSucceeds(
-        baseXMLString, desiredXMLString, desiredNetCalls, done) {
+    async function testSucceeds(
+        baseXMLString, desiredXMLString, desiredNetCalls) {
       let desiredXML = parser.parseFromString(desiredXMLString, 'text/xml')
           .documentElement;
-      testRequest(baseXMLString).then(function(finalXML) {
-        expect(fakeNetEngine.request).toHaveBeenCalledTimes(desiredNetCalls);
-        expect(finalXML).toEqualElement(desiredXML);
-        return Promise.resolve();
-      }).catch(fail).then(done);
+      let finalXML = await testRequest(baseXMLString);
+      expect(fakeNetEngine.request).toHaveBeenCalledTimes(desiredNetCalls);
+      expect(finalXML).toEqualElement(desiredXML);
     }
 
-    function testFails(baseXMLString, desiredError, desiredNetCalls, done) {
-      testRequest(baseXMLString).then(fail).catch(function(error) {
+    function testFails(baseXMLString, desiredError, desiredNetCalls) {
+      return testRequest(baseXMLString).then(fail).catch(function(error) {
         expect(fakeNetEngine.request).toHaveBeenCalledTimes(desiredNetCalls);
         if (desiredError) {
           shaka.test.Util.expectToEqualError(error, desiredError);
         }
         return Promise.resolve();
-      }).then(done);
+      });
     }
 
     /**
@@ -736,12 +734,12 @@ describe('MpdUtils', function() {
     }
 
     /**
-     * @param {string=} opt_toReplaceOne
-     * @param {string=} opt_toReplaceTwo
+     * @param {string=} toReplaceOne
+     * @param {string=} toReplaceTwo
      * @return {string}
      * @private
      */
-    function inBaseContainer(opt_toReplaceOne, opt_toReplaceTwo) {
+    function inBaseContainer(toReplaceOne = '', toReplaceTwo = '') {
       let format =
           '<Container xmlns="urn:mpeg:dash:schema:mpd:2011" ' +
           'xmlns:xlink="http://www.w3.org/1999/xlink">' +
@@ -751,8 +749,8 @@ describe('MpdUtils', function() {
           '%(toReplaceTwo)s' +
           '</Container>';
       return sprintf(format, {
-        toReplaceOne: opt_toReplaceOne || '',
-        toReplaceTwo: opt_toReplaceTwo || ''});
+        toReplaceOne: toReplaceOne,
+        toReplaceTwo: toReplaceTwo});
     }
 
     function testRequest(baseXMLString) {

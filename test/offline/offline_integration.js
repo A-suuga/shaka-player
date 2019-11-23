@@ -15,19 +15,18 @@
  * limitations under the License.
  */
 
-describe('Offline', /** @suppress {accessControls} */ function() {
+describe('Offline', () => {
   /** @type {!shaka.Player} */
   let player;
   /** @type {!shaka.offline.Storage} */
   let storage;
   /** @type {!HTMLVideoElement} */
   let video;
+  /** @type {!shaka.util.EventManager} */
+  let eventManager;
 
   beforeAll(function() {
-    video = /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-    video.width = 600;
-    video.height = 400;
-    video.muted = true;
+    video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
   });
 
@@ -39,21 +38,25 @@ describe('Offline', /** @suppress {accessControls} */ function() {
     player = new shaka.Player(video);
     player.addEventListener('error', fail);
 
+    eventManager = new shaka.util.EventManager();
+
     if (supportsStorage()) {
       // Make sure we are starting with a blank slate.
-      await shaka.offline.Storage.deleteAll(player);
+      await shaka.offline.Storage.deleteAll();
       storage = new shaka.offline.Storage(player);
     }
   });
 
   afterEach(async function() {
+    eventManager.release();
+
     if (storage) {
       await storage.destroy();
     }
 
     // Make sure we don't leave anything in storage after the test.
     if (supportsStorage()) {
-      await shaka.offline.Storage.deleteAll(player);
+      await shaka.offline.Storage.deleteAll();
     }
 
     if (player) {
@@ -75,18 +78,15 @@ describe('Offline', /** @suppress {accessControls} */ function() {
         contentUri, 'Stored content should have an offline uri.');
 
     await player.load(content.offlineUri);
+
     video.play();
-
-    await shaka.test.Util.delay(10);
-    expect(video.currentTime).toBeGreaterThan(3);
-    expect(video.ended).toBe(false);
-
+    await playTo(/* end= */ 3, /* timeout= */ 10);
     await player.unload();
     await storage.remove(contentUri);
   });
 
   // TODO: Add a PlayReady version once Edge supports offline.
-  drm_it(
+  drmIt(
       'stores, plays, and deletes protected content with a persistent license',
       async function() {
         if (!supportsStorage()) {
@@ -107,22 +107,26 @@ describe('Offline', /** @suppress {accessControls} */ function() {
         storage.configure({usePersistentLicense: true});
         let content = await storage.store('test:sintel-enc');
 
+        // Work around http://crbug.com/887535 in which load cannot happen right
+        // after close.  Experimentally, we seem to need a ~1s delay, so we're
+        // using a 3s delay to ensure it doesn't flake.  Without this, we get
+        // error 6005 (FAILED_TO_CREATE_SESSION) with system code 70.
+        // TODO: Remove when Chrome is fixed
+        await shaka.test.Util.delay(3);
+
         let contentUri = content.offlineUri;
         goog.asserts.assert(
             contentUri, 'Stored content should have an offline uri.');
 
         await player.load(contentUri);
+
         video.play();
-
-        await shaka.test.Util.delay(10);
-        expect(video.currentTime).toBeGreaterThan(3);
-        expect(video.ended).toBe(false);
-
+        await playTo(/* end= */ 3, /* timeout= */ 10);
         await player.unload();
         await storage.remove(contentUri);
       });
 
-  drm_it(
+  drmIt(
       'stores, plays, and deletes protected content with a temporary license',
       async function() {
         if (!supportsStorage()) {
@@ -152,15 +156,22 @@ describe('Offline', /** @suppress {accessControls} */ function() {
             contentUri, 'Stored content should have an offline uri.');
 
         await player.load(contentUri);
+
         video.play();
-
-        await shaka.test.Util.delay(10);
-        expect(video.currentTime).toBeGreaterThan(3);
-        expect(video.ended).toBe(false);
-
+        await playTo(/* end= */ 3, /* timeout= */ 10);
         await player.unload();
         await storage.remove(contentUri);
       });
+
+  /**
+   * @param {number} endSeconds
+   * @param {number} timeoutSeconds
+   * @return {!Promise}
+   */
+  async function playTo(endSeconds, timeoutSeconds) {
+    await shaka.test.Util.waitUntilPlayheadReaches(
+        eventManager, video, endSeconds, timeoutSeconds);
+  }
 
   /** @return {boolean} */
   function supportsStorage() {

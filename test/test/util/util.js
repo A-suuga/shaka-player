@@ -19,7 +19,6 @@ goog.provide('shaka.test.StatusPromise');
 goog.provide('shaka.test.Util');
 
 
-
 /**
  * @param {!Promise} p
  * @constructor
@@ -46,12 +45,12 @@ shaka.test.StatusPromise.prototype.status;
 /**
  * Fakes an event loop. Each tick processes some number of instantaneous
  * operations and advances the simulated clock forward by 1 second. Calls
- * opt_onTick just before each tick if it's specified.
+ * onTick just before each tick if it's specified.
  *
  * @param {number} duration The number of seconds of simulated time.
- * @param {function(number)=} opt_onTick
+ * @param {function(number)=} onTick
  */
-shaka.test.Util.fakeEventLoop = function(duration, opt_onTick) {
+shaka.test.Util.fakeEventLoop = function(duration, onTick) {
   expect(window.Promise).toBe(PromiseMock);
 
   // Run this synchronously:
@@ -62,8 +61,8 @@ shaka.test.Util.fakeEventLoop = function(duration, opt_onTick) {
       PromiseMock.flush();
     }
 
-    if (opt_onTick) {
-      opt_onTick(time);
+    if (onTick) {
+      onTick(time);
     }
     jasmine.clock().tick(1000);
     PromiseMock.flush();
@@ -75,12 +74,12 @@ shaka.test.Util.fakeEventLoop = function(duration, opt_onTick) {
  * Returns a Promise which is resolved after the given delay.
  *
  * @param {number} seconds The delay in seconds.
- * @param {function(function(), number)=} opt_setTimeout
+ * @param {function(function(), number)=} realSetTimeout
  * @return {!Promise}
  */
-shaka.test.Util.delay = function(seconds, opt_setTimeout) {
+shaka.test.Util.delay = function(seconds, realSetTimeout) {
   return new Promise(function(resolve, reject) {
-    let timeout = opt_setTimeout || setTimeout;
+    let timeout = realSetTimeout || setTimeout;
     timeout(function() {
       resolve();
       // Play nicely with PromiseMock by flushing automatically.
@@ -93,32 +92,25 @@ shaka.test.Util.delay = function(seconds, opt_setTimeout) {
 
 
 /**
- * @param {*} actual
- * @param {!Object} expected
+ * @param {!shaka.util.Error} error
+ * @return {*}
  */
-shaka.test.Util.expectToEqualError = function(actual, expected) {
-  // NOTE: Safari will add extra properties to any thrown object, so we
-  // wrap expectedError in jasmine.objectContaining to ignore them.
-  // NOTE: We now add extra properties ourselves for the sake of formatting.
-  // These, we delete from 'expected'.
-  delete expected['stack'];
-  delete expected['message'];
-  expect(actual).toEqual(jasmine.objectContaining(expected));
+shaka.test.Util.jasmineError = function(error) {
+  // NOTE: Safari will add extra properties to any thrown object, and some of
+  // the properties we compute in debug builds are unhelpful and introduce
+  // inconsistency in tests.  Therefore we only capture the critical fields
+  // below.
+  const {severity, category, code, data} = error;
+  return jasmine.objectContaining({severity, category, code, data});
 };
 
 
 /**
-  * Registers a custom matcher for Element objects, called 'toEqualElement'.
-  * @private
-  */
-shaka.test.Util.registerElementMatcher_ = function() {
-  jasmine.addMatchers({
-    toEqualElement: function(util, customEqualityTesters) {
-      return {
-        compare: shaka.test.Util.expectToEqualElementCompare_
-      };
-    }
-  });
+ * @param {*} actual
+ * @param {!shaka.util.Error} expected
+ */
+shaka.test.Util.expectToEqualError = function(actual, expected) {
+  expect(actual).toEqual(shaka.test.Util.jasmineError(expected));
 };
 
 
@@ -292,15 +284,288 @@ shaka.test.Util.spyFunc = function(spy) {
 
 /**
  * @param {!jasmine.Spy} spy
- * @param {...*} var_args
+ * @param {...*} varArgs
  * @return {*}
  */
-shaka.test.Util.invokeSpy = function(spy, var_args) {
+shaka.test.Util.invokeSpy = function(spy, varArgs) {
   return spy.apply(null, Array.prototype.slice.call(arguments, 1));
+};
+
+
+/**
+ * @param {boolean} loadUncompiled
+ * @return {*}
+ */
+shaka.test.Util.loadShaka = async function(loadUncompiled) {
+  /** @type {!shaka.util.PublicPromise} */
+  const loaded = new shaka.util.PublicPromise();
+  let compiledShaka;
+  if (loadUncompiled) {
+    // For debugging purposes, use the uncompiled library.
+    compiledShaka = shaka;
+    loaded.resolve();
+  } else {
+    // Load the compiled library as a module.
+    // All tests in this suite will use the compiled library.
+    require(['/base/dist/shaka-player.ui.js'], (shakaModule) => {
+      compiledShaka = shakaModule;
+      compiledShaka.net.NetworkingEngine.registerScheme(
+          'test', shaka.test.TestScheme);
+      compiledShaka.media.ManifestParser.registerParserByMime(
+          'application/x-test-manifest',
+          shaka.test.TestScheme.ManifestParser);
+
+      loaded.resolve();
+    }, (error) => {
+      loaded.reject('Failed to load compiled player.');
+      shaka.log.error('Error loading compiled player.', error);
+    });
+  }
+
+  await loaded;
+  return compiledShaka;
+};
+
+
+/**
+ * @param {!Element} cssLink
+ */
+shaka.test.Util.setupCSS = async function(cssLink) {
+  const head = document.head;
+  cssLink.type = 'text/css';
+  cssLink.rel = 'stylesheet/less';
+  cssLink.href ='/base/ui/controls.less';
+  head.appendChild(cssLink);
+
+  // LESS script has been added at the beginning of the test pass
+  // (in test/test/boot.js). This tells it that we've added a new
+  // stylesheet, so LESS can process it.
+  less.registerStylesheetsImmediately();
+  await less.refresh(/* reload */ true,
+    /* modifyVars*/ false, /* clearFileCache */ false);
+};
+
+/**
+ * Thoroughly clean up after UI-related tests.
+ *
+ * The UI tests can create lots of DOM elements (including videos) that are
+ * easy to lose track of.  This is a universal cleanup system to avoid leaving
+ * anything behind.
+ */
+shaka.test.Util.cleanupUI = async function() {
+  // If we don't clean up the UI, these tests could pollute the environment
+  // for other tests that run later, causing failures in unrelated tests.
+  // This is causing particular issues on Tizen.
+  const containers =
+      document.querySelectorAll('[data-shaka-player-container]');
+
+  const destroys = [];
+  for (let container of containers) {
+    const ui = /** @type {shaka.ui.Overlay} */(container['ui']);
+
+    // Destroying the UI destroys the controls and player inside.
+    destroys.push(ui.destroy());
+  }
+  await Promise.all(destroys);
+
+  // Now remove all the containers from the DOM.
+  for (let container of containers) {
+    container.parentElement.removeChild(container);
+  }
+};
+
+/**
+ * Wait for the video playhead to move forward by some meaningful delta.
+ * If this happens before |timeout| seconds pass, the Promise is resolved.
+ * Otherwise, the Promise is rejected.
+ *
+ * @param {shaka.util.EventManager} eventManager
+ * @param {!HTMLMediaElement} target
+ * @param {number} timeout in seconds, after which the Promise fails
+ * @return {!Promise}
+ */
+shaka.test.Util.waitForMovementOrFailOnTimeout =
+    (eventManager, target, timeout) => {
+  // TODO: Refactor all the wait utils into a class that avoids repeated args
+  const timeGoal = target.currentTime + 1;
+  let goalMet = false;
+  const startTime = Date.now();
+  console.assert(!target.ended, 'Video should not be ended!');
+  shaka.log.info('Waiting for movement from', target.currentTime,
+                 'to', timeGoal);
+
+  return new Promise((resolve, reject) => {
+    eventManager.listen(target, 'timeupdate', () => {
+      if (target.currentTime >= timeGoal || target.ended) {
+        goalMet = true;
+        const endTime = Date.now();
+        const seconds = ((endTime - startTime) / 1000).toFixed(2);
+        shaka.log.info('Movement goal met after ' + seconds + ' seconds');
+
+        eventManager.unlisten(target, 'timeupdate');
+        resolve();
+      }
+    });
+
+    shaka.test.Util.delay(timeout).then(() => {
+      // This check is only necessary to supress the error log.  It's fine to
+      // unlisten twice or to reject after resolve.  Neither of those actions
+      // matter.  But the error log can be confusing during debugging if we
+      // have already met the movement goal.
+      if (!goalMet) {
+        const buffered = [];
+        for (let i = 0; i < target.buffered.length; ++i) {
+          buffered.push({
+            start: target.buffered.start(i),
+            end: target.buffered.end(i),
+          });
+        }
+
+        shaka.log.error('Timeout waiting for playback.',
+                        'current time', target.currentTime,
+                        'ready state', target.readyState,
+                        'playback rate', target.playbackRate,
+                        'paused', target.paused,
+                        'buffered', buffered);
+
+        eventManager.unlisten(target, 'timeupdate');
+        reject(new Error('Timeout while waiting for playback!'));
+      }
+    });
+  });
+};
+
+/**
+ * @param {shaka.util.EventManager} eventManager
+ * @param {!HTMLMediaElement} target
+ * @param {number} playheadTime The time to wait for.
+ * @param {number} timeout in seconds, after which the Promise fails
+ * @return {!Promise}
+ */
+shaka.test.Util.waitUntilPlayheadReaches =
+    (eventManager, target, playheadTime, timeout) => {
+  let goalMet = false;
+
+  // TODO: Refactor all the wait utils into a class that avoids repeated args
+  return new Promise(function(resolve, reject) {
+    eventManager.listen(target, 'timeupdate', function() {
+      if (target.currentTime >= playheadTime) {
+        goalMet = true;
+        eventManager.unlisten(target, 'timeupdate');
+        resolve();
+      }
+    });
+
+    shaka.test.Util.delay(timeout).then(function() {
+      if (!goalMet) {
+        const buffered = [];
+        for (let i = 0; i < target.buffered.length; ++i) {
+          buffered.push({
+            start: target.buffered.start(i),
+            end: target.buffered.end(i),
+          });
+        }
+
+        shaka.log.error('Timeout waiting for target time', playheadTime,
+                        'current time', target.currentTime,
+                        'ready state', target.readyState,
+                        'playback rate', target.playbackRate,
+                        'paused', target.paused,
+                        'buffered', buffered);
+
+        eventManager.unlisten(target, 'timeupdate');
+        reject(new Error('Timeout waiting for time ' + playheadTime));
+      }
+    });
+  });
+};
+
+/**
+ * Wait for the video to end or for |timeout| seconds to pass, whichever
+ * occurs first.  The Promise is resolved when either of these happens.
+ *
+ * @param {shaka.util.EventManager} eventManager
+ * @param {!HTMLMediaElement} target
+ * @param {number} timeout in seconds, after which the Promise succeeds
+ * @return {!Promise}
+ */
+shaka.test.Util.waitForEndOrTimeout = (eventManager, target, timeout) => {
+  // TODO: Refactor all the wait utils into a class that avoids repeated args
+  return new Promise((resolve, reject) => {
+    const callback = () => {
+      eventManager.unlisten(target, 'ended');
+      resolve();
+    };
+
+    // Whichever happens first resolves the Promise.
+    eventManager.listen(target, 'ended', callback);
+    shaka.test.Util.delay(timeout).then(callback);
+  });
+};
+
+/**
+ * @const
+ * @private
+ */
+shaka.test.Util.customMatchers_ = {
+  // Custom matcher for Element objects.
+  toEqualElement: (util, customEqualityTesters) =>{
+    return {
+      compare: shaka.test.Util.expectToEqualElementCompare_,
+    };
+  },
+  // Custom matcher for working with spies.
+  toHaveBeenCalledOnceMore: (util, customEqualityTesters) => {
+    return {
+      compare: (actual, expected) => {
+        const callCount = actual.calls.count();
+
+        const result = {};
+
+        if (callCount != 1) {
+          result.pass = false;
+          result.message = 'Expected to be called once, not ' + callCount;
+        } else {
+          result.pass = true;
+        }
+
+        actual.calls.reset();
+
+        return result;
+      },
+    };
+  },
+  toHaveBeenCalledOnceMoreWith: (util, customEqualityTesters) => {
+    return {
+      compare: (actual, expected) => {
+        const callCount = actual.calls.count();
+        const callArgs = callCount > 0 ?
+                         actual.calls.mostRecent().args :
+                         [];
+
+        const result = {};
+
+        if (callCount != 1) {
+          result.pass = false;
+          result.message = 'Expected to be called once, not ' + callCount;
+        } else if (!util.equals(callArgs, expected, customEqualityTesters)) {
+          result.pass = false;
+          result.message =
+              'Expected to be called with ' + expected + ' not ' + callArgs;
+        } else {
+          result.pass = true;
+        }
+
+        actual.calls.reset();
+
+        return result;
+      },
+    };
+  },
 };
 
 
 beforeEach(function() {
   jasmine.addCustomEqualityTester(shaka.test.Util.compareReferences);
-  shaka.test.Util.registerElementMatcher_();
+  jasmine.addMatchers(shaka.test.Util.customMatchers_);
 });

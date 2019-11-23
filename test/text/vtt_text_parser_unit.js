@@ -18,17 +18,18 @@
 describe('VttTextParser', function() {
   const Cue = shaka.text.Cue;
   const CueRegion = shaka.text.CueRegion;
+  const originalLogWarning = shaka.log.warning;
 
   /** @type {!jasmine.Spy} */
   let logWarningSpy;
 
-  beforeAll(function() {
+  beforeEach(() => {
     logWarningSpy = jasmine.createSpy('shaka.log.warning');
     shaka.log.warning = shaka.test.Util.spyFunc(logWarningSpy);
   });
 
-  beforeEach(function() {
-    logWarningSpy.calls.reset();
+  afterEach(() => {
+    shaka.log.warning = originalLogWarning;
   });
 
   it('supports no cues', function() {
@@ -62,7 +63,7 @@ describe('VttTextParser', function() {
   it('handles a blank line at the end of the file', function() {
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000\n' +
@@ -73,19 +74,19 @@ describe('VttTextParser', function() {
   it('handles no blank line at the end of the file', function() {
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000\n' +
         'Test\n',
-        {periodStart: 0, segmentStart: 0, segmentEnd: 0
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0,
         });
   });
 
   it('handles no newline after the final text payload', function() {
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000\n' +
@@ -96,7 +97,7 @@ describe('VttTextParser', function() {
   it('ignores offset', function() {
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000\n' +
@@ -108,7 +109,7 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 20, end: 40, payload: 'Test', id: '1'},
-          {start: 40, end: 50, payload: 'Test2', id: '2'}
+          {start: 40, end: 50, payload: 'Test2', id: '2'},
         ],
         'WEBVTT\n\n' +
         '1\n' +
@@ -124,7 +125,7 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 20, end: 40, payload: 'Test'},
-          {start: 40, end: 50, payload: 'Test2'}
+          {start: 40, end: 50, payload: 'Test2'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000\n' +
@@ -138,7 +139,7 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 20, end: 40, payload: 'Test'},
-          {start: 40, end: 50, payload: 'Test2'}
+          {start: 40, end: 50, payload: 'Test2'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000\n' +
@@ -153,7 +154,7 @@ describe('VttTextParser', function() {
   it('supports non-integer timecodes', function() {
     verifyHelper(
         [
-          {start: 20.1, end: 40.505, payload: 'Test'}
+          {start: 20.1, end: 40.505, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.100 --> 00:00:40.505\n' +
@@ -164,7 +165,7 @@ describe('VttTextParser', function() {
   it('supports large timecodes', function() {
     verifyHelper(
         [
-          {start: 20, end: 108000, payload: 'Test'}
+          {start: 20, end: 108000, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 30:00:00.000\n' +
@@ -215,14 +216,14 @@ describe('VttTextParser', function() {
             start: 20,
             end: 40,
             payload: 'Test',
-            writingDirection: Cue.writingDirection.VERTICAL_RIGHT_TO_LEFT
+            writingMode: Cue.writingMode.VERTICAL_RIGHT_TO_LEFT,
           },
           {
             start: 40,
             end: 50,
             payload: 'Test2',
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 vertical:rl\n' +
@@ -237,21 +238,21 @@ describe('VttTextParser', function() {
         [
           {
             start: 20, end: 40, payload: 'Test', line: 0,
-            lineInterpretation: Cue.lineInterpretation.LINE_NUMBER
+            lineInterpretation: Cue.lineInterpretation.LINE_NUMBER,
           },
           {
             start: 40, end: 50, payload: 'Test2', line: -1,
-            lineInterpretation: Cue.lineInterpretation.LINE_NUMBER
+            lineInterpretation: Cue.lineInterpretation.LINE_NUMBER,
           },
           {
             start: 50, end: 60, payload: 'Test3', line: 45,
-            lineInterpretation: Cue.lineInterpretation.PERCENTAGE
+            lineInterpretation: Cue.lineInterpretation.PERCENTAGE,
           },
           {
             start: 55, end: 65, payload: 'Test4', line: 12.3,
-            lineInterpretation: Cue.lineInterpretation.PERCENTAGE
-          }
-        ] ,
+            lineInterpretation: Cue.lineInterpretation.PERCENTAGE,
+          },
+        ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 line:0\n' +
         'Test\n\n' +
@@ -270,14 +271,14 @@ describe('VttTextParser', function() {
           {
             start: 20, end: 40, payload: 'Test', line: 10,
             lineInterpretation: Cue.lineInterpretation.PERCENTAGE,
-            lineAlign: Cue.lineAlign.START
+            lineAlign: Cue.lineAlign.START,
           },
           {
             start: 40, end: 50, payload: 'Test2', line: -1,
             lineInterpretation: Cue.lineInterpretation.LINE_NUMBER,
-            lineAlign: Cue.lineAlign.CENTER
-          }
-        ] ,
+            lineAlign: Cue.lineAlign.CENTER,
+          },
+        ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 line:10%,start\n' +
         'Test\n\n' +
@@ -290,7 +291,7 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 20, end: 40, payload: 'Test', position: 45},
-          {start: 25, end: 45, payload: 'Test2', position: 12.3}
+          {start: 25, end: 45, payload: 'Test2', position: 12.3},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 position:45%\n' +
@@ -305,12 +306,12 @@ describe('VttTextParser', function() {
         [
           {
             start: 20, end: 40, payload: 'Test', position: 45,
-            positionAlign: Cue.positionAlign.LEFT
+            positionAlign: Cue.positionAlign.LEFT,
           },
           {
             start: 20, end: 40, payload: 'Test2', position: 45,
-            positionAlign: Cue.positionAlign.LEFT
-          }
+            positionAlign: Cue.positionAlign.LEFT,
+          },
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 position:45%,line-left\n' +
@@ -324,7 +325,7 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 20, end: 40, payload: 'Test', size: 56},
-          {start: 25, end: 45, payload: 'Test2', size: 12.3}
+          {start: 25, end: 45, payload: 'Test2', size: 12.3},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 size:56%\n' +
@@ -337,7 +338,7 @@ describe('VttTextParser', function() {
   it('supports align setting', function() {
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test', align: 'center'}
+          {start: 20, end: 40, payload: 'Test', align: 'center'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 align:center\n' +
@@ -354,8 +355,8 @@ describe('VttTextParser', function() {
             payload: 'Test',
             textAlign: Cue.textAlign.CENTER,
             size: 56,
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 align:center size:56% vertical:lr\n' +
@@ -372,8 +373,8 @@ describe('VttTextParser', function() {
             payload: 'Test',
             textAlign: Cue.textAlign.CENTER,
             size: 56,
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         'WEBVTT\n\n' +
         '0:00:20.000 --> 00:00:40.000 align:center size:56% vertical:lr\n' +
@@ -390,8 +391,8 @@ describe('VttTextParser', function() {
             payload: 'Test',
             textAlign: Cue.textAlign.CENTER,
             size: 56,
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 0:00:40.000 align:center size:56% vertical:lr\n' +
@@ -408,8 +409,8 @@ describe('VttTextParser', function() {
             payload: 'Test',
             align: 'center',
             size: 56,
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         'WEBVTT\n\n' +
         '0:00:20.000 --> 0:00:40.000 align:center size:56% vertical:lr\n' +
@@ -426,8 +427,8 @@ describe('VttTextParser', function() {
             payload: 'Test',
             align: 'center',
             size: 56,
-            writingDirection: Cue.writingDirection.VERTICAL_LEFT_TO_RIGHT
-          }
+            writingMode: Cue.writingMode.VERTICAL_LEFT_TO_RIGHT,
+          },
         ],
         'WEBVTT\n\n' +
         '0:00:20.000 --> 0:00:40.000 align:center size:56% vertical:lr\n' +
@@ -454,9 +455,9 @@ describe('VttTextParser', function() {
               heightUnits: CueRegion.units.LINES,
               widthUnits: CueRegion.units.PERCENTAGE,
               viewportAnchorUnits: CueRegion.units.PERCENTAGE,
-              scroll: CueRegion.scrollMode.UP
-            }
-          }
+              scroll: CueRegion.scrollMode.UP,
+            },
+          },
         ],
         'WEBVTT\n' +
         'Region: id=reg1 width=50% lines=3 regionanchor=0%,100% ' +
@@ -471,7 +472,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 vertical:es\n' +
@@ -480,7 +481,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 vertical:\n' +
@@ -489,7 +490,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 vertical\n' +
@@ -498,7 +499,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 line:-3%\n' +
@@ -507,7 +508,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 line:45%%\n' +
@@ -516,7 +517,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 align:10\n' +
@@ -525,7 +526,7 @@ describe('VttTextParser', function() {
 
     verifyHelper(
         [
-          {start: 20, end: 40, payload: 'Test'}
+          {start: 20, end: 40, payload: 'Test'},
         ],
         'WEBVTT\n\n' +
         '00:00:20.000 --> 00:00:40.000 align:foo\n' +
@@ -539,8 +540,8 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 30, end: 50, payload: 'Test'},
-          {start: 50, end: 60, payload: 'Test2'}
-        ] ,
+          {start: 50, end: 60, payload: 'Test2'},
+        ],
         // 900000 = 10 sec, so expect every timestamp to be 10
         // seconds ahead of what is specified.
         'WEBVTT\n' +
@@ -557,8 +558,8 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 120, end: 140, payload: 'Test'},
-          {start: 140, end: 150, payload: 'Test2'}
-        ] ,
+          {start: 140, end: 150, payload: 'Test2'},
+        ],
         // 900000 = 10 sec, so expect every timestamp to be 10
         // seconds ahead of what is specified.
         'WEBVTT\n' +
@@ -576,7 +577,7 @@ describe('VttTextParser', function() {
     verifyHelper(
         [
           {start: 20, end: 40, payload: 'Test'},
-          {start: 40, end: 50, payload: 'Test2'}
+          {start: 40, end: 50, payload: 'Test2'},
         ],
         'WEBVTT\n\n' +
         'STYLE\n::cue(.cyan) { color: cyan; }\n\n' +
@@ -591,7 +592,7 @@ describe('VttTextParser', function() {
   /**
    * @param {!Array} cues
    * @param {string} text
-   * @param {shakaExtern.TextParser.TimeContext} time
+   * @param {shaka.extern.TextParser.TimeContext} time
    */
   function verifyHelper(cues, text, time) {
     let data = new Uint8Array(shaka.util.StringUtils.toUTF8(text));
@@ -608,7 +609,7 @@ describe('VttTextParser', function() {
         expect(result[i].id).toBe(cues[i].id);
       }
       if ('vertical' in cues[i]) {
-        expect(result[i].writingDirection).toBe(cues[i].writingDirection);
+        expect(result[i].writingMode).toBe(cues[i].writingMode);
       }
       if ('line' in cues[i]) {
         expect(result[i].line).toBe(cues[i].line);
@@ -631,7 +632,7 @@ describe('VttTextParser', function() {
 
   /**
    * @param {!Object} expected
-   * @param {shakaExtern.CueRegion} actual
+   * @param {shaka.extern.CueRegion} actual
    */
   function verifyRegion(expected, actual) {
     let properties = ['id', 'viewportAnchorX', 'viewportAnchorY',
@@ -651,7 +652,7 @@ describe('VttTextParser', function() {
   /**
    * @param {shaka.util.Error.Code} code
    * @param {string} text
-   * @param {shakaExtern.TextParser.TimeContext} time
+   * @param {shaka.extern.TextParser.TimeContext} time
    */
   function errorHelper(code, text, time) {
     let error = new shaka.util.Error(

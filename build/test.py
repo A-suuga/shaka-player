@@ -191,8 +191,8 @@ class Launcher:
         action='store_true')
     running_commands.add_argument(
         '--runs',
-        help='Set the number of times each test should run. This '
-             'defaults to 1.',
+        help='Set the number of times each test should run. (default '
+             '%(default)s) ',
         type=_IntGreaterThanZero,
         default=1,
         dest='runs')
@@ -215,16 +215,16 @@ class Launcher:
     running_commands.add_argument(
         '--capture-timeout',
         help='Kill the browser if it does not capture in the given time [ms]. '
-             'This defaults to one minute.',
+             '(default %(default)s)',
         type=int,
         default=60000)
     running_commands.add_argument(
         '--delay-tests',
-        help='Insert an artifical delay between tests [s]. '
+        help='Insert an artificial delay between tests, in seconds. '
              'This can be helpful when tracking down asynchronous test '
              'pollution, in which an async process belonging to one test may '
              'trigger a failure after other tests have begun. '
-             'If no delay is specified, defaults to 2 seconds.',
+             '(default %(const)s)',
         type=int,
         default=None,
         const=2,
@@ -242,6 +242,12 @@ class Launcher:
         type=str,
         metavar='KEY_SYSTEM_ID=LICENSE_SERVER_URI',
         action=_HandleKeyValuePairs)
+    running_commands.add_argument(
+        '--test-timeout',
+        help='Sets the test timeout value [ms] (default %(default)s)',
+        dest='test_timeout',
+        default=120000,
+        type=int)
 
 
     logging_commands.add_argument(
@@ -267,9 +273,9 @@ class Launcher:
         action='store_true')
     logging_commands.add_argument(
         '--enable-logging',
-        help='Print log messages from tests and limits the type of log messages '
-             'printed. If no value is given "info" will be used. If '
-             '--enable-logging is not used, logging will default to "none".',
+        help='Print log messages from tests and limits the type of log '
+             'messages printed. If --enable-logging is not given, no logs '
+             'will be printed.  (default %(const)s)',
         choices=['none', 'error', 'warning', 'info', 'debug', 'v1', 'v2'],
         default='none',
         const='info',
@@ -348,6 +354,7 @@ class Launcher:
       'delay_tests',
       'test_custom_asset',
       'test_custom_license_server',
+      'test_timeout',
     ]
 
     # Check each value before setting it to avoid passing null values.
@@ -379,6 +386,10 @@ class Launcher:
     if self.parsed_args.exclude_browsers and 'browsers' in self.karma_config:
       all_browsers = set(self.karma_config['browsers'])
       bad_browsers = set(self.parsed_args.exclude_browsers)
+      if bad_browsers - all_browsers:
+        raise RuntimeError('Attempting to exclude unselected browsers: %s' %
+                           ','.join(bad_browsers - all_browsers))
+
       good_browsers = all_browsers - bad_browsers
       self.karma_config['browsers'] = list(good_browsers)
 
@@ -405,7 +416,7 @@ class Launcher:
     # There is no need to print a status here as the gendep and build
     # calls will print their own status updates.
     if self.parsed_args.build:
-      if gendeps.gen_deps([]) != 0:
+      if gendeps.main([]) != 0:
         logging.error('Failed to generate project dependencies')
         return 1
 
@@ -421,7 +432,8 @@ class Launcher:
     # Run the command.
     results = []
     for run in range(self.parsed_args.runs):
-      logging.info('Running test (%d / %d)...', run + 1, self.parsed_args.runs)
+      logging.info('Running test (%d / %d, %d failed so far)...',
+          run + 1, self.parsed_args.runs, len(results) - results.count(0))
       results.append(shakaBuildHelpers.execute_get_code(cmd))
 
     # Print a summary of the results.

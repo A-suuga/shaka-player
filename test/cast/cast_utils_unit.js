@@ -22,21 +22,24 @@ describe('CastUtils', function() {
   it('includes every Player member', function() {
     let ignoredMembers = [
       'constructor',  // JavaScript added field
+      'getSharedConfiguration',  // Handled specially
       'getNetworkingEngine',  // Handled specially
       'getMediaElement',  // Handled specially
       'setMaxHardwareResolution',
       'destroy',  // Should use CastProxy.destroy instead
       'drmInfo',  // Too large to proxy
       'getManifest', // Too large to proxy
+      // TODO(vaage): Remove |getManifestUri| references in v2.6.
+      'getManifestUri',  // Handled specially by CastProxy
+      'getManifestParserFactory',  // Would not serialize.
 
       // Test helper methods (not @export'd)
       'createDrmEngine',
       'createNetworkingEngine',
       'createPlayhead',
-      'createPlayheadObserver',
       'createMediaSource',
       'createMediaSourceEngine',
-      'createStreamingEngine'
+      'createStreamingEngine',
     ];
 
     let castMembers = CastUtils.PlayerVoidMethods
@@ -50,17 +53,16 @@ describe('CastUtils', function() {
     let playerMembers = Object.keys(shaka.Player.prototype).filter(
         function(name) {
           // Private members end with _.
-          return ignoredMembers.indexOf(name) < 0 &&
-              name.substr(name.length - 1) != '_';
+          return !ignoredMembers.includes(name) && !name.endsWith('_');
         });
 
     // To make debugging easier, don't check that they are equal; instead check
     // that neither has any extra entries.
     let extraCastMembers = castMembers.filter(function(name) {
-      return playerMembers.indexOf(name) < 0;
+      return !playerMembers.includes(name);
     });
     let extraPlayerMembers = playerMembers.filter(function(name) {
-      return castMembers.indexOf(name) < 0;
+      return !castMembers.includes(name);
     });
     expect(extraCastMembers).toEqual([]);
     expect(extraPlayerMembers).toEqual([]);
@@ -76,7 +78,7 @@ describe('CastUtils', function() {
         'true': true,
         'false': false,
         'one': 1,
-        'string': 'a string'
+        'string': 'a string',
       };
 
       let serialized = CastUtils.serialize(orig);
@@ -101,12 +103,12 @@ describe('CastUtils', function() {
         'bubbles',
         'type',
         'cancelable',
-        'defaultPrevented'
+        'defaultPrevented',
       ];
       let extraProperties = {
         'key': 'value',
         'true': true,
-        'one': 1
+        'one': 1,
       };
 
       for (let k in extraProperties) {
@@ -141,12 +143,12 @@ describe('CastUtils', function() {
         'bubbles',
         'type',
         'cancelable',
-        'defaultPrevented'
+        'defaultPrevented',
       ];
       let extraProperties = {
         'key': 'value',
         'true': true,
-        'one': 1
+        'one': 1,
       };
 
       for (let k in extraProperties) {
@@ -189,9 +191,7 @@ describe('CastUtils', function() {
       let mediaSourceEngine;
 
       beforeAll(function() {
-        video =
-            /** @type {!HTMLVideoElement} */ (document.createElement('video'));
-        video.muted = true;
+        video = shaka.util.Dom.createVideoElement();
         document.body.appendChild(video);
       });
 
@@ -200,7 +200,7 @@ describe('CastUtils', function() {
         // to get ranges to use.
         let fakeVideoStream = {
           mimeType: 'video/mp4',
-          codecs: 'avc1.42c01e'
+          codecs: 'avc1.42c01e',
         };
         let initSegmentUrl = '/base/test/test/assets/sintel-video-init.mp4';
         let videoSegmentUrl = '/base/test/test/assets/sintel-video-segment.mp4';
@@ -213,44 +213,45 @@ describe('CastUtils', function() {
           fail('Error code ' + (video.error ? video.error.code : 0));
         }
 
-        mediaSourceEngine = new shaka.media.MediaSourceEngine(video);
+        mediaSourceEngine = new shaka.media.MediaSourceEngine(
+            video,
+            new shaka.test.FakeClosedCaptionParser(),
+            new shaka.test.FakeTextDisplayer());
 
-        // Create empty object first and initialize the fields through
-        // [] to allow field names to be expressions.
-        let initObject = {};
         const ContentType = shaka.util.ManifestParserUtils.ContentType;
-        initObject[ContentType.VIDEO] = fakeVideoStream;
+        const initObject = new Map();
+        initObject.set(ContentType.VIDEO, fakeVideoStream);
 
         mediaSourceEngine.init(initObject, false).then(function() {
           return shaka.test.Util.fetch(initSegmentUrl);
         }).then(function(data) {
           return mediaSourceEngine.appendBuffer(ContentType.VIDEO, data,
-                                                null, null);
+              null, null, /* hasClosedCaptions */ false);
         }).then(function() {
           return shaka.test.Util.fetch(videoSegmentUrl);
         }).then(function(data) {
           return mediaSourceEngine.appendBuffer(ContentType.VIDEO, data,
-                                                null, null);
+              null, null, /* hasClosedCaptions */ false);
         }).catch(fail).then(done);
       });
 
-      afterEach(function(done) {
-        eventManager.destroy().then(function() {
-          if (mediaSourceEngine) {
-            return mediaSourceEngine.destroy();
-          }
-        }).then(function() {
-          video.removeAttribute('src');
-          video.load();
-          done();
-        });
+      afterEach(async () => {
+        eventManager.release();
+
+        if (mediaSourceEngine) {
+          await mediaSourceEngine.destroy();
+        }
+
+        // "unload" the video element.
+        video.removeAttribute('src');
+        video.load();
       });
 
       afterAll(function() {
         document.body.removeChild(video);
       });
 
-      quarantined_it('deserialize into equivalent objects', function() {
+      quarantinedIt('deserialize into equivalent objects', function() {
         let buffered = video.buffered;
 
         // The test is less interesting if the ranges are empty.

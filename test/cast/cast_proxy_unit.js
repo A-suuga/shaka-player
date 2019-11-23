@@ -33,18 +33,11 @@ describe('CastProxy', function() {
   /** @type {shaka.cast.CastProxy} */
   let proxy;
 
-  beforeAll(function() {
+  beforeEach(() => {
     mockCastSenderConstructor = jasmine.createSpy('CastSender constructor');
     mockCastSenderConstructor.and.callFake(createMockCastSender);
-
     shaka.cast.CastSender = Util.spyFunc(mockCastSenderConstructor);
-  });
 
-  afterAll(function() {
-    shaka.cast.CastSender = originalCastSender;
-  });
-
-  beforeEach(function() {
     mockVideo = new shaka.test.FakeVideo();
     mockPlayer = createMockPlayer();
     mockSender = null;
@@ -52,8 +45,12 @@ describe('CastProxy', function() {
     proxy = new CastProxy(mockVideo, mockPlayer, fakeAppId);
   });
 
-  afterEach(function(done) {
-    proxy.destroy().catch(fail).then(done);
+  afterEach(async () => {
+    try {
+      await proxy.destroy();
+    } finally {
+      shaka.cast.CastSender = originalCastSender;
+    }
   });
 
   describe('constructor', function() {
@@ -139,7 +136,7 @@ describe('CastProxy', function() {
       mockPlayer.getConfiguration.and.returnValue(fakeConfig);
       mockPlayer.isTextTrackVisible.and.returnValue(false);
       let fakeManifestUri = 'foo://bar';
-      mockPlayer.getManifestUri.and.returnValue(fakeManifestUri);
+      mockPlayer.getAssetUri.and.returnValue(fakeManifestUri);
 
       proxy.cast();
       let calls = mockSender.cast.calls;
@@ -218,7 +215,7 @@ describe('CastProxy', function() {
         let cache = {video: {
           currentTime: 24,
           paused: false,
-          play: jasmine.createSpy('play')
+          play: jasmine.createSpy('play'),
         }};
         mockSender.get.and.callFake(function(targetName, property) {
           expect(targetName).toEqual('video');
@@ -307,7 +304,7 @@ describe('CastProxy', function() {
         mockVideo.on['timeupdate'](fakeEvent);
         expect(proxyListener).toHaveBeenCalledWith(jasmine.objectContaining({
           type: 'timeupdate',
-          detail: 8675309
+          detail: 8675309,
         }));
       });
 
@@ -342,7 +339,7 @@ describe('CastProxy', function() {
         mockSender.onRemoteEvent('video', fakeEvent);
         expect(proxyListener).toHaveBeenCalledWith(jasmine.objectContaining({
           type: 'timeupdate',
-          detail: 8675309
+          detail: 8675309,
         }));
       });
     });
@@ -377,7 +374,7 @@ describe('CastProxy', function() {
         let cache = {player: {
           getConfiguration: fakeConfig2,
           isTextTrackVisible: true,
-          trickPlay: jasmine.createSpy('trickPlay')
+          trickPlay: jasmine.createSpy('trickPlay'),
         }};
         mockSender.get.and.callFake(function(targetName, property) {
           expect(targetName).toEqual('player');
@@ -453,7 +450,7 @@ describe('CastProxy', function() {
         mockPlayer.listeners['buffering'](fakeEvent);
         expect(proxyListener).toHaveBeenCalledWith(jasmine.objectContaining({
           type: 'buffering',
-          detail: 8675309
+          detail: 8675309,
         }));
       });
 
@@ -488,7 +485,7 @@ describe('CastProxy', function() {
         mockSender.onRemoteEvent('player', fakeEvent);
         expect(proxyListener).toHaveBeenCalledWith(jasmine.objectContaining({
           type: 'buffering',
-          detail: 8675309
+          detail: 8675309,
         }));
       });
     });
@@ -501,7 +498,7 @@ describe('CastProxy', function() {
       expect(listener).not.toHaveBeenCalled();
       mockSender.onCastStatusChanged();
       expect(listener).toHaveBeenCalledWith(jasmine.objectContaining({
-        type: 'caststatuschanged'
+        type: 'caststatuschanged',
       }));
     });
   });
@@ -534,12 +531,12 @@ describe('CastProxy', function() {
       cache = {
         video: {
           loop: true,
-          playbackRate: 5
+          playbackRate: 5,
         },
         player: {
           getConfiguration: {key: 'value'},
-          isTextTrackVisisble: true
-        }
+          isTextTrackVisisble: true,
+        },
       };
       mockSender.get.and.callFake(function(targetName, property) {
         if (targetName == 'player') {
@@ -579,7 +576,7 @@ describe('CastProxy', function() {
 
     it('loads the manifest', function() {
       cache.video.currentTime = 12;
-      cache.player.getManifestUri = 'foo://bar';
+      cache.player.getAssetUri = 'foo://bar';
       expect(mockPlayer.load).not.toHaveBeenCalled();
 
       mockSender.onResumeLocal();
@@ -590,7 +587,7 @@ describe('CastProxy', function() {
     it('does not provide a start time if the video has ended', function() {
       cache.video.currentTime = 12;
       cache.video.ended = true;
-      cache.player.getManifestUri = 'foo://bar';
+      cache.player.getAssetUri = 'foo://bar';
       expect(mockPlayer.load).not.toHaveBeenCalled();
 
       mockSender.onResumeLocal();
@@ -599,7 +596,7 @@ describe('CastProxy', function() {
     });
 
     it('plays the video after loading', function(done) {
-      cache.player.getManifestUri = 'foo://bar';
+      cache.player.getAssetUri = 'foo://bar';
       // Should play even if the video was paused remotely.
       cache.video.paused = true;
       mockVideo.autoplay = true;
@@ -616,7 +613,7 @@ describe('CastProxy', function() {
     });
 
     it('does not load or play without a manifest URI', function(done) {
-      cache.player.getManifestUri = null;
+      cache.player.getAssetUri = null;
 
       mockSender.onResumeLocal();
 
@@ -634,7 +631,7 @@ describe('CastProxy', function() {
     });
 
     it('triggers an "error" event if load fails', function(done) {
-      cache.player.getManifestUri = 'foo://bar';
+      cache.player.getAssetUri = 'foo://bar';
       let fakeError = new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
           shaka.util.Error.Category.MANIFEST,
@@ -706,7 +703,7 @@ describe('CastProxy', function() {
       onCastStatusChanged: onCastStatusChanged,
       onFirstCastStateUpdate: onFirstCastStateUpdate,
       onRemoteEvent: onRemoteEvent,
-      onResumeLocal: onResumeLocal
+      onResumeLocal: onResumeLocal,
     };
     mockSender.cast.and.returnValue(Promise.resolve());
     return mockSender;
@@ -717,7 +714,7 @@ describe('CastProxy', function() {
       load: jasmine.createSpy('load'),
       unload: jasmine.createSpy('unload'),
       getNetworkingEngine: jasmine.createSpy('getNetworkingEngine'),
-      getManifestUri: jasmine.createSpy('getManifestUri'),
+      getAssetUri: jasmine.createSpy('getAssetUri'),
       getConfiguration: jasmine.createSpy('getConfiguration'),
       configure: jasmine.createSpy('configure'),
       isTextTrackVisible: jasmine.createSpy('isTextTrackVisible'),
@@ -732,7 +729,7 @@ describe('CastProxy', function() {
       },
       dispatchEvent: jasmine.createSpy('dispatchEvent'),
       // For convenience:
-      listeners: {}
+      listeners: {},
     };
     player.load.and.returnValue(Promise.resolve());
     player.unload.and.returnValue(Promise.resolve());

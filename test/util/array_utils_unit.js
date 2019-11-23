@@ -18,41 +18,52 @@
 describe('ArrayUtils', function() {
   const ArrayUtils = shaka.util.ArrayUtils;
 
-  describe('removeDuplicates', function() {
-    it('will remove duplicate elements', function() {
-      let arr = [1, 2, 2, 5, 6, 3, 1, 2];
-      expect(ArrayUtils.removeDuplicates(arr)).toEqual([1, 2, 5, 6, 3]);
+  describe('hasSameElements', function() {
+    it('determines same elements', () => {
+      expectEqual([], []);
+      expectEqual([1, 2, 3], [1, 2, 3]);
+      expectEqual([1, 2, 3], [3, 2, 1]);
+      expectEqual([1, 1, 2], [1, 2, 1]);
+      expectEqual([1, 2, 2, 1], [1, 2, 1, 2]);
+      expectEqual([1, NaN, NaN], [NaN, NaN, 1]);
+
+      expectNotEqual([1], [2]);
+      expectNotEqual([1, 2], [1]);
+      expectNotEqual([1, 1, 2], [1, 2]);
+      expectNotEqual([1, 2], [1, 1, 2]);
+      expectNotEqual([1, 2], [1, 2, 3]);
+      expectNotEqual([1, 2, 3, 1], [1, 2, 1, 2]);
     });
 
-    it('removes duplicate NaN', function() {
-      let arr = [NaN, 1, NaN, 2, NaN, NaN];
-      expect(ArrayUtils.removeDuplicates(arr)).toEqual([NaN, 1, 2]);
+    it('handles different types', () => {
+      expectEqual(['1', 2], [2, '1']);
+      const a = {};
+      expectEqual([a], [a]);
+      expectEqual([1, a], [a, 1]);
+
+      expectNotEqual(['f'], [NaN]);
+      expectNotEqual([{}], [{}]);
+      expectNotEqual([1], [{}]);
+      expectNotEqual([1], ['1']);
     });
 
-    it('does nothing if no duplicates', function() {
-      let arr = [1, 2, 3, 6, 5, 4];
-      expect(ArrayUtils.removeDuplicates(arr)).toEqual(arr);
+    it('allows custom comparer', () => {
+      const comp = (a, b) => a.i == b.i;
+      expectEqual([{i: 1}], [{i: 1}], comp);
+      expectEqual([{i: 1}, {i: 2}], [{i: 2}, {i: 1}], comp);
+      expectEqual([{i: 1}, {i: 1}], [{i: 1}, {i: 1}], comp);
+      expectEqual([{i: 1, x: 1}], [{i: 1, x: 2}], comp);
+
+      expectNotEqual([{i: 1}], [{i: 1}, {i: 1}], comp);
+      expectNotEqual([{i: 1}], [{i: 2}], comp);
     });
 
-    it('accepts an optional comparator', function() {
-      let arr = ['aaa', 'abc', 'bat', 'car', 'cat'];
-      let comparator = function(a, b) { return a[0] === b[0]; };
-      expect(ArrayUtils.removeDuplicates(arr, comparator))
-          .toEqual(['aaa', 'bat', 'car']);
-    });
-  });
+    function expectEqual(a, b, comp = undefined) {
+      expect(ArrayUtils.hasSameElements(a, b, comp)).toBe(true);
+    }
 
-  describe('indexOf', function() {
-    it('will find a matching element', function() {
-      let arr = ['aaa', 'bbb', 'ccc'];
-      let comparator = function(a, b) { return a[0] === b[0]; };
-      expect(ArrayUtils.indexOf(arr, 'bat', comparator)).toBe(1);
-    });
-
-    it('will return -1 if not found', function() {
-      let arr = ['aaa', 'bbb', 'ccc'];
-      let comparator = function(a, b) { return a[0] === b[0]; };
-      expect(ArrayUtils.indexOf(arr, 'zoo', comparator)).toBe(-1);
-    });
+    function expectNotEqual(a, b, comp = undefined) {
+      expect(ArrayUtils.hasSameElements(a, b, comp)).toBe(false);
+    }
   });
 });

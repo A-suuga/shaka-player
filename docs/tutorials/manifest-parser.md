@@ -50,14 +50,14 @@ the `Player` to create new parser instances.  A new instance is created for
 #### configure
 
 This method is called right after creating the object and when the configuration
-changes.  This is passed a {@link shakaExtern.ManifestConfiguration} object
+changes.  This is passed a {@link shaka.extern.ManifestConfiguration} object
 from the Player.
 
 #### start
 
 This method is called to load the manifest.  This is called with a string URI
 that is passed to `load()` and a
-{@link shakaExtern.ManifestParser.PlayerInterface} object.  The interface object
+{@link shaka.extern.ManifestParser.PlayerInterface} object.  The interface object
 contains a number of fields that are used to interact with the Player.  This
 includes the `NetworkingEngine` instance to make network requests.  This also
 includes callback methods that allow the parser to raise Player events and
@@ -216,7 +216,7 @@ In order to support Live content, the manifest may need to be updated.  In the
 `setInterval`) to update the manifest.  Then it should re-parse the manifest
 periodically.  To add new segments to the streams, simply add them to the
 segment index.  Because the original manifest object is modified in-place,
-adding them to the index will allow the Player to use them. You *cannnot* add
+adding them to the index will allow the Player to use them. You *cannot* add
 new Variants or text streams to an existing Period.
 
 To add a new Period, you must first call `filterNewPeriod`. This will filter out
@@ -330,7 +330,7 @@ MyManifestParser.prototype.loadReference_ = function(i, start, end) {
 
 If your content is encrypted, there are a few changes to the manifest you need
 to do.  First, for each Variant that contains encrypted content, you need to set
-`variant.drmInfos` to an array of {@link shakaExtern.DrmInfo} objects.  All the
+`variant.drmInfos` to an array of {@link shaka.extern.DrmInfo} objects.  All the
 fields (except the key-system name) can be set to the default and will be
 replaced by settings from the Player configuration.  If the `drmInfos` array
 is empty, the content is expected to be clear.
