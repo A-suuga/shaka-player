@@ -111,8 +111,8 @@ def main(args):
 
   if not compile_less('ui', 'controls', parsed_args):
     return 1;
-  if not compile_less('demo', 'demo', parsed_args):
-    return 1
+  # if not compile_less('demo', 'demo', parsed_args):
+  #   return 1
 
   build_args_with_ui = ['--name', 'ui', '+@complete']
   build_args_with_ui += ['--locales'] + parsed_args.locales

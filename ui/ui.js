@@ -186,6 +186,15 @@ shaka.ui.Overlay.prototype.setEnabled = function(enabled) {
 
 
 /**
+ * @param {shaka.util.CozyUtils.CozyInfo} cozy
+ * @export
+ */
+shaka.ui.Overlay.cozyEntryPoint = async function(cozy) {
+  await shaka.ui.Overlay.scanPageForShakaElements_(cozy);
+};
+
+
+/**
  * @return {!shaka.extern.UIConfiguration}
  * @private
  */
@@ -224,9 +233,10 @@ shaka.ui.Overlay.prototype.defaultConfig_ = function() {
 
 
 /**
+ * @param {shaka.util.CozyUtils.CozyInfo} cozy
  * @private
  */
-shaka.ui.Overlay.scanPageForShakaElements_ = async function() {
+shaka.ui.Overlay.scanPageForShakaElements_ = async function(cozy) {
   // Install built-in polyfills to patch browser incompatibilities.
   shaka.polyfill.installAll();
   // Check to see if the browser supports the basic APIs Shaka needs.
@@ -272,7 +282,7 @@ shaka.ui.Overlay.scanPageForShakaElements_ = async function() {
       videoParent.replaceChild(container, video);
       container.appendChild(video);
 
-        shaka.ui.Overlay.setupUIandAutoLoad_(container, video);
+        shaka.ui.Overlay.setupUIandAutoLoad_(cozy, container, video);
     }
   } else {
     for (let i = 0; i < containers.length; i++) {
@@ -303,7 +313,7 @@ shaka.ui.Overlay.scanPageForShakaElements_ = async function() {
       }
 
       // eslint-disable-next-line no-await-in-loop
-      await shaka.ui.Overlay.setupUIandAutoLoad_(container, video);
+      await shaka.ui.Overlay.setupUIandAutoLoad_(cozy, container, video);
     }
   }
 
@@ -329,13 +339,14 @@ shaka.ui.Overlay.dispatchLoadedEvent_ = function(eventName) {
 
 
 /**
+ * @param {shaka.util.CozyUtils.CozyInfo} cozy
  * @param {!Element} container
  * @param {!Element} video
  * @private
  */
-shaka.ui.Overlay.setupUIandAutoLoad_ = async function(container, video) {
+shaka.ui.Overlay.setupUIandAutoLoad_ = async function(cozy, container, video) {
   // Create the UI
-    const player = new shaka.Player(
+    const player = new shaka.Player(cozy,
         shaka.util.Dom.asHTMLMediaElement(video));
     const ui = new shaka.ui.Overlay(player,
       shaka.util.Dom.asHTMLElement(container),
@@ -388,12 +399,3 @@ shaka.ui.Overlay.setupUIandAutoLoad_ = async function(container, video) {
     }
   }
 };
-
-
-if (document.readyState == 'complete') {
-  // Don't fire this event synchronously.  In a compiled bundle, the "shaka"
-  // namespace might not be exported to the window until after this point.
-  Promise.resolve().then(shaka.ui.Overlay.scanPageForShakaElements_);
-} else {
-  window.addEventListener('load', shaka.ui.Overlay.scanPageForShakaElements_);
-}
